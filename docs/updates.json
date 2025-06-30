@@ -1,7 +1,17 @@
 {
   "addons": {
-    "dsp-roster-management@yourcompany.com": {
-      "updates": []
+    "dsp-roster-management@maxwell.com": {
+      "updates": [
+        {
+          "version": "1.2.0",
+          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.2.0/dsp-management-1.2.0.xpi",
+          "applications": {
+            "gecko": { 
+              "strict_min_version": "75.0" 
+            }
+          }
+        }
+      ]
     }
   }
 }
