@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSP Management Extension</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .download-section {
+            background: #e8f4fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .github-link {
+            display: inline-block;
+            background: #24292e;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            margin: 10px 5px;
+            text-decoration: none;
+        }
+        .github-link:hover {
+            background: #444d56;
+        }
+        .install-steps {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 DSP Management Extension</h1>
+        <p>Automated DSP rostering management with notifications for Firefox</p>
+    </div>
+
+    <div class="download-section">
+        <h2>📥 Download & Installation</h2>
+        <p>Get the latest version from our GitHub releases:</p>
+
+        <a href="https://github.com/Maxxy21/dsp-extension-hosting/releases/latest" class="github-link">
+            📦 Download Latest Release
+        </a>
+
+        <a href="https://github.com/Maxxy21/dsp-extension-hosting" class="github-link">
+            📚 View on GitHub
+        </a>
+    </div>
+
+    <div class="install-steps">
+        <h3>🔧 Installation Steps:</h3>
+        <ol>
+            <li>Click "Download Latest Release" above</li>
+            <li>Download the <code>.xpi</code> file from the release</li>
+            <li>Open Firefox</li>
+            <li>Go to <code>about:addons</code></li>
+            <li>Click the gear icon ⚙️ in the top-right</li>
+            <li>Select "Install Add-on From File..."</li>
+            <li>Choose the downloaded <code>.xpi</code> file</li>
+            <li>Click "Add" when prompted</li>
+        </ol>
+    </div>
+
+    <div class="warning">
+        <h3>🔄 Automatic Updates</h3>
+        <p>Once installed, the extension will automatically check for updates. You don't need to manually download new versions.</p>
+        <p><strong>Update server:</strong> <code>https://maxxy21.github.io/dsp-extension-hosting/updates.json</code></p>
+    </div>
+
+    <h2>📋 Features</h2>
+    <ul>
+        <li>✅ Automatic DSP roster mismatch detection</li>
+        <li>✅ Dual daily checks at 2:00 PM and 3:30 PM</li>
+        <li>✅ Amazon Chime webhook notifications</li>
+        <li>✅ Manual check functionality</li>
+        <li>✅ Custom message broadcasting</li>
+        <li>✅ Cross-browser compatibility</li>
+    </ul>
+
+    <h2>🔧 Configuration</h2>
+    <p>After installation, configure your DSP webhook URLs in the extension settings to receive notifications.</p>
+
+    <h2>📞 Support</h2>
+    <p>For issues or questions, please <a href="https://github.com/Maxxy21/dsp-extension-hosting/issues">create an issue on GitHub</a>.</p>
+
+    <footer style="margin-top: 40px; padding: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
+        <p>DSP Management Extension - Open Source Firefox Extension</p>
+    </footer>
+</body>
+</html>
