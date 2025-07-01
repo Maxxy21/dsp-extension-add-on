@@ -17,7 +17,17 @@ const CONFIG = {
         'manifest-v3.json',
         'web-ext-artifacts',
         '*.zip',
-        '*.xpi'
+        '*.xpi',
+        '*.sh',
+        'scripts/',
+        'package.json',
+        'package-lock.json',
+        'node_modules/',
+        '.git/',
+        '.github/',
+        'docs/',
+        'README.md',
+        '.gitignore'
     ]
 };
 

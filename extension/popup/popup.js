@@ -1,4 +1,4 @@
-// popup/popup.js - Working modern implementation
+// popup/popup.js - Fixed unsafe innerHTML assignments
 
 // Ensure browser polyfill is available
 if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
@@ -15,19 +15,19 @@ let elements = {};
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎉 Modern popup initializing...');
-    
+
     // Cache DOM elements
     cacheElements();
-    
+
     // Setup event listeners
     setupEventListeners();
-    
+
     // Load DSP options
     loadDSPOptions();
-    
+
     // Setup character counter
     setupCharacterCounter();
-    
+
     console.log('✅ Popup initialized successfully');
 });
 
@@ -126,18 +126,31 @@ function clearDSPOptions() {
 
     // Clear checkbox container
     if (elements.checkboxContainer) {
-        elements.checkboxContainer.innerHTML = '';
+        // Safe way to clear content without innerHTML
+        while (elements.checkboxContainer.firstChild) {
+            elements.checkboxContainer.removeChild(elements.checkboxContainer.firstChild);
+        }
     }
 }
 
 function showEmptyDSPState() {
     if (elements.checkboxContainer) {
-        elements.checkboxContainer.innerHTML = `
-            <div style="text-align: center; padding: 20px; color: var(--text-muted);">
-                <p><strong>No DSPs configured</strong></p>
-                <p style="font-size: 12px; margin-top: 4px;">Add webhook URLs in Settings to get started</p>
-            </div>
-        `;
+        // Safe way to create elements without innerHTML
+        const emptyDiv = document.createElement('div');
+        emptyDiv.style.cssText = 'text-align: center; padding: 20px; color: var(--text-muted);';
+
+        const title = document.createElement('p');
+        const titleStrong = document.createElement('strong');
+        titleStrong.textContent = 'No DSPs configured';
+        title.appendChild(titleStrong);
+
+        const description = document.createElement('p');
+        description.style.cssText = 'font-size: 12px; margin-top: 4px;';
+        description.textContent = 'Add webhook URLs in Settings to get started';
+
+        emptyDiv.appendChild(title);
+        emptyDiv.appendChild(description);
+        elements.checkboxContainer.appendChild(emptyDiv);
     }
 
     if (elements.totalDspCount) {
@@ -165,14 +178,32 @@ function populateDSPOptions(dspCodes) {
         });
     }
 
-    // Populate checkbox container
+    // Populate checkbox container safely
     if (elements.checkboxContainer) {
-        elements.checkboxContainer.innerHTML = sortedDspCodes.map(dspCode => `
-            <div class="checkbox-option">
-                <input type="checkbox" id="dsp-${dspCode}" value="${dspCode}">
-                <label for="dsp-${dspCode}" class="checkbox-label">${dspCode}</label>
-            </div>
-        `).join('');
+        // Clear existing content safely
+        while (elements.checkboxContainer.firstChild) {
+            elements.checkboxContainer.removeChild(elements.checkboxContainer.firstChild);
+        }
+
+        // Create checkboxes safely without innerHTML
+        sortedDspCodes.forEach(dspCode => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'checkbox-option';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `dsp-${dspCode}`;
+            checkbox.value = dspCode;
+
+            const label = document.createElement('label');
+            label.htmlFor = `dsp-${dspCode}`;
+            label.className = 'checkbox-label';
+            label.textContent = dspCode;
+
+            optionDiv.appendChild(checkbox);
+            optionDiv.appendChild(label);
+            elements.checkboxContainer.appendChild(optionDiv);
+        });
     }
 
     // Update total count
@@ -397,7 +428,7 @@ function updateCharacterCount() {
     const message = elements.messageInput?.value || '';
     if (elements.charCount) {
         elements.charCount.textContent = `${message.length} characters`;
-        
+
         // Color code based on length
         if (message.length > 1800) {
             elements.charCount.style.color = 'var(--error)';
@@ -457,21 +488,45 @@ function setButtonLoading(button, loading) {
         button.disabled = true;
         button.classList.add('loading');
         if (!button.dataset.originalText) {
-            button.dataset.originalText = button.innerHTML;
+            button.dataset.originalText = button.textContent;
         }
-        // Show loading spinner
-        button.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="animation: spin 1s linear infinite;">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" opacity="0.25"/>
-                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" opacity="0.75"/>
-            </svg>
-            <span>Processing...</span>
-        `;
+
+        // Create loading content safely
+        button.textContent = '';
+
+        const loadingSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        loadingSvg.setAttribute('width', '16');
+        loadingSvg.setAttribute('height', '16');
+        loadingSvg.setAttribute('viewBox', '0 0 24 24');
+        loadingSvg.setAttribute('fill', 'none');
+        loadingSvg.style.animation = 'spin 1s linear infinite';
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '10');
+        circle.setAttribute('stroke', 'currentColor');
+        circle.setAttribute('stroke-width', '4');
+        circle.setAttribute('opacity', '0.25');
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('fill', 'currentColor');
+        path.setAttribute('d', 'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z');
+        path.setAttribute('opacity', '0.75');
+
+        loadingSvg.appendChild(circle);
+        loadingSvg.appendChild(path);
+
+        const span = document.createElement('span');
+        span.textContent = 'Processing...';
+
+        button.appendChild(loadingSvg);
+        button.appendChild(span);
     } else {
         button.disabled = false;
         button.classList.remove('loading');
         if (button.dataset.originalText) {
-            button.innerHTML = button.dataset.originalText;
+            button.textContent = button.dataset.originalText;
         }
     }
 }
