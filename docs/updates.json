@@ -3,9 +3,9 @@
     "dsp-roster-management@maxwell.com": {
       "updates": [
         {
-          "version": "1.4.10",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.10/dsp-extension-v1.4.10.xpi",
-          "update_hash": "sha256:dfcb7419c0c73acd69ef68b83c9c1d04ebb721c7dac18b5dffe1efb77c721adc",
+          "version": "1.4.11",
+          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.11/dsp-extension-v1.4.11.xpi",
+          "update_hash": "sha256:55baf28168b0f49c443d906f637cf783cf7b0a186474a485b994af0177ac1d90",
           "applications": {
             "gecko": {
               "strict_min_version": "75.0"
