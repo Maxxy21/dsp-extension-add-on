@@ -1,7 +1,11 @@
 {
   "manifest_version": 2,
   "name": "DSP Roster Management Tool",
+<<<<<<< HEAD
   "version": "1.4.3",
+=======
+  "version": "1.4.28",
+>>>>>>> e42277f11dea8a22fa1147c22097543990963499
   "description": "DSP rostering management with automatic notifications and messaging. Cross-browser compatible.",
 
   "permissions": [
