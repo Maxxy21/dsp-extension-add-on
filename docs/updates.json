@@ -3,59 +3,9 @@
     "dsp-roster-management@maxwell.com": {
       "updates": [
         {
-<<<<<<< HEAD
-          "version": "1.2.0",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.2.0/dsp-extension.xpi",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.3.0",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.3.0/dsp-extension-v1.3.0.xpi",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.4.0",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.0/dsp-extension-v1.4.0.xpi",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.4.1",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.1/dsp-extension-v1.4.1.xpi",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.4.2",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.2/dsp-extension-v1.4.2.xpi",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.4.3",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.3/dsp-extension-v1.4.3.xpi",
-=======
-          "version": "1.4.28",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.28/dsp-extension-v1.4.28.xpi",
-          "update_hash": "sha256:32f6505660fedbcc7b52e2d2210191993e2bc01142cdb5fc833e3240aef0edd9",
->>>>>>> e42277f11dea8a22fa1147c22097543990963499
+          "version": "1.4.10",
+          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.4.10/dsp-extension-v1.4.10.xpi",
+          "update_hash": "sha256:1a690b33b2b086705c675cf88ccd6468532b1e54759285295271cbb1c2039d72",
           "applications": {
             "gecko": {
               "strict_min_version": "75.0"
