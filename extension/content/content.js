@@ -256,7 +256,6 @@ class MismatchHighlighter {
             // Highlight confirmed cell's parent
             if (confirmedCell.parentElement) {
                 confirmedCell.parentElement.style.backgroundColor = CONFIG.STYLES.HIGHLIGHT_COLOR;
-               
                 confirmedCell.parentElement.title = tooltip;
             }
             
@@ -289,7 +288,7 @@ class DSPManagementTool {
         try {
             console.log('DSP Tool: Initializing...');
             
-            // Wait for page to be ready
+            // Wait for page to be loaded
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => this.setupTool());
             } else {

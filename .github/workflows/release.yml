@@ -11,9 +11,10 @@ on:
       version_type:
         description: 'Version bump type'
         required: true
-        default: 'patch'
+        default: 'use_existing'
         type: choice
         options:
+          - use_existing
           - patch
           - minor
           - major
@@ -32,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 2  # Need to compare with previous commit
+          fetch-depth: 2
 
       - name: Check if should release
         id: should_release
@@ -77,77 +78,149 @@ jobs:
           npm install
           npm install -g web-ext
 
-      - name: Determine version bump
+      - name: Determine version
         if: steps.should_release.outputs.should_release == 'true'
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION_TYPE="${{ github.event.inputs.version_type }}"
-          else
-            VERSION_TYPE="patch"
-          fi
-          
-          # Get current version
+          # Get current version from manifest
           CURRENT_VERSION=$(node -p "require('./extension/manifest.json').version")
-          echo "Current version: $CURRENT_VERSION"
+          echo "Current version in manifest: $CURRENT_VERSION"
           
-          # Calculate new version
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]}
+          # Check if manual dispatch requested version bump
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.version_type }}" != "use_existing" ]; then
+            VERSION_TYPE="${{ github.event.inputs.version_type }}"
+            echo "Manual version bump requested: $VERSION_TYPE"
           
-          case $VERSION_TYPE in
-            "major")
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            "minor")
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            "patch")
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
+            # Calculate new version
+            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+            MAJOR=${VERSION_PARTS[0]}
+            MINOR=${VERSION_PARTS[1]}
+            PATCH=${VERSION_PARTS[2]}
           
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "New version: $NEW_VERSION"
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            case $VERSION_TYPE in
+              "major")
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              "minor")
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              "patch")
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+          
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+            echo "Calculated new version: $NEW_VERSION"
+          
+            # Update manifest with new version
+            sed -i 's/"version": "[^"]*"/"version": "'$NEW_VERSION'"/' extension/manifest.json
+            echo "Updated manifest.json to version $NEW_VERSION"
+          
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            # Use existing version from manifest (no auto-increment)
+            echo "Using existing version: $CURRENT_VERSION"
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Update manifest version
+      - name: Check if release already exists
         if: steps.should_release.outputs.should_release == 'true'
+        id: check_release
         run: |
-          sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' extension/manifest.json
-          echo "Updated manifest.json to version ${{ steps.version.outputs.version }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Check if release already exists
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists"
+            echo "release_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Release v$VERSION does not exist, proceeding"
+            echo "release_exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build extension
-        if: steps.should_release.outputs.should_release == 'true'
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
         run: |
           echo "🔨 Building extension..."
           
           # Create dist directory
           mkdir -p dist
           
-          # Create XPI file
+          # Create unsigned XPI file first
           cd extension
-          zip -r "../dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" . \
+          zip -r "../dist/dsp-extension-v${{ steps.version.outputs.version }}-unsigned.xpi" . \
             -x "*.log" ".DS_Store" "Thumbs.db" "*.tmp" "manifest-v3.json" "*.sh" "scripts/*"
           cd ..
           
-          # Generate SHA256 hash
-          SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
-          echo "SHA256: $SHA256"
-          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "📦 Created unsigned version"
         id: build
 
+      - name: Sign extension with Mozilla
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
+        run: |
+          if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
+            echo "🔏 Signing extension with Mozilla..."
+          
+            cd extension
+            web-ext sign \
+              --api-key="$WEB_EXT_API_KEY" \
+              --api-secret="$WEB_EXT_API_SECRET" \
+              --channel=unlisted \
+              --artifacts-dir=../dist \
+              --timeout=600000
+            cd ..
+          
+            # Find the signed XPI and rename it
+            SIGNED_XPI=$(find dist -name "*.xpi" -not -name "*unsigned*" | head -1)
+            if [ -n "$SIGNED_XPI" ]; then
+              mv "$SIGNED_XPI" "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi"
+              echo "✅ Extension signed successfully"
+          
+              # Generate SHA256 hash of signed version
+              SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
+              echo "SHA256: $SHA256"
+              echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Signed XPI not found, using unsigned version"
+              mv "dist/dsp-extension-v${{ steps.version.outputs.version }}-unsigned.xpi" "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi"
+          
+              # Generate SHA256 hash of unsigned version
+              SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
+              echo "SHA256: $SHA256"
+              echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ Mozilla API credentials not set, using unsigned version"
+            mv "dist/dsp-extension-v${{ steps.version.outputs.version }}-unsigned.xpi" "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi"
+          
+            # Generate SHA256 hash
+            SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
+            echo "SHA256: $SHA256"
+            echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          fi
+        id: sign
+
       - name: Create GitHub Release
-        if: steps.should_release.outputs.should_release == 'true'
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🚀 Creating GitHub release..."
+          
+          # Determine if extension is signed
+          if [ -n "${{ secrets.WEB_EXT_API_KEY }}" ] && [ -n "${{ secrets.WEB_EXT_API_SECRET }}" ]; then
+            SIGNED_STATUS="✅ Mozilla Signed"
+          else
+            SIGNED_STATUS="⚠️ Unsigned (requires about:debugging installation)"
+          fi
           
           # Create release notes
           cat > release-notes.md << EOF
@@ -165,7 +238,8 @@ jobs:
           
           ### 📊 Build Information
           - **Version**: ${{ steps.version.outputs.version }}
-          - **SHA256**: \`${{ steps.build.outputs.sha256 }}\`
+          - **Status**: $SIGNED_STATUS
+          - **SHA256**: \`${{ steps.sign.outputs.sha256 }}\`
           - **Build Date**: $(date -u)
           
           ### 🚀 Changes in this version
@@ -184,20 +258,46 @@ jobs:
             --latest
 
       - name: Update docs/updates.json
-        if: steps.should_release.outputs.should_release == 'true'
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
         run: |
           echo "📝 Updating updates.json..."
           
           # Ensure docs directory exists
           mkdir -p docs
           
-          # Get existing updates.json or create new structure
+          # Get existing updates or start fresh
           if [ -f "docs/updates.json" ]; then
-            cp docs/updates.json docs/updates.json.backup
-          fi
+            # Add new version to existing updates
+            node -e "
+              const fs = require('fs');
+              const updates = JSON.parse(fs.readFileSync('docs/updates.json', 'utf8'));
+              const newUpdate = {
+                version: '${{ steps.version.outputs.version }}',
+                update_link: 'https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v${{ steps.version.outputs.version }}/dsp-extension-v${{ steps.version.outputs.version }}.xpi',
+                update_hash: 'sha256:${{ steps.sign.outputs.sha256 }}',
+                applications: {
+                  gecko: {
+                    strict_min_version: '75.0'
+                  }
+                }
+              };
           
-          # Create updated updates.json with new version
-          cat > docs/updates.json << EOF
+              // Remove existing version if present
+              updates.addons['dsp-roster-management@maxwell.com'].updates = 
+                updates.addons['dsp-roster-management@maxwell.com'].updates.filter(u => u.version !== '${{ steps.version.outputs.version }}');
+          
+              // Add new version
+              updates.addons['dsp-roster-management@maxwell.com'].updates.push(newUpdate);
+          
+              // Sort by version
+              updates.addons['dsp-roster-management@maxwell.com'].updates.sort((a, b) => 
+                a.version.localeCompare(b.version, undefined, { numeric: true }));
+          
+              fs.writeFileSync('docs/updates.json', JSON.stringify(updates, null, 2));
+            "
+          else
+            # Create new updates.json
+            cat > docs/updates.json << EOF
           {
             "addons": {
               "dsp-roster-management@maxwell.com": {
@@ -205,7 +305,7 @@ jobs:
                   {
                     "version": "${{ steps.version.outputs.version }}",
                     "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v${{ steps.version.outputs.version }}/dsp-extension-v${{ steps.version.outputs.version }}.xpi",
-                    "update_hash": "sha256:${{ steps.build.outputs.sha256 }}",
+                    "update_hash": "sha256:${{ steps.sign.outputs.sha256 }}",
                     "applications": {
                       "gecko": {
                         "strict_min_version": "75.0"
@@ -217,149 +317,30 @@ jobs:
             }
           }
           EOF
-
-      - name: Update GitHub Pages
-        if: steps.should_release.outputs.should_release == 'true'
-        run: |
-          echo "🌐 Updating GitHub Pages..."
-          
-          # Create/update index.html (same as before)
-          cat > docs/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>DSP Management Extension</title>
-              <style>
-                  body {
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                      max-width: 800px;
-                      margin: 0 auto;
-                      padding: 20px;
-                      line-height: 1.6;
-                      color: #333;
-                  }
-                  .header {
-                      text-align: center;
-                      margin-bottom: 40px;
-                      padding: 20px;
-                      background: #f8f9fa;
-                      border-radius: 8px;
-                  }
-                  .download-section {
-                      background: #e8f4fd;
-                      padding: 20px;
-                      border-radius: 8px;
-                      margin: 20px 0;
-                  }
-                  .github-link {
-                      display: inline-block;
-                      background: #24292e;
-                      color: white;
-                      padding: 10px 20px;
-                      border-radius: 6px;
-                      margin: 10px 5px;
-                      text-decoration: none;
-                  }
-                  .github-link:hover {
-                      background: #444d56;
-                  }
-                  .install-steps {
-                      background: #f8f9fa;
-                      padding: 20px;
-                      border-radius: 8px;
-                      margin: 20px 0;
-                  }
-                  .warning {
-                      background: #fff3cd;
-                      border: 1px solid #ffeaa7;
-                      padding: 15px;
-                      border-radius: 4px;
-                      margin: 20px 0;
-                  }
-              </style>
-          </head>
-          <body>
-              <div class="header">
-                  <h1>🚀 DSP Management Extension</h1>
-                  <p>Automated DSP rostering management with notifications for Firefox</p>
-              </div>
-
-              <div class="download-section">
-                  <h2>📥 Download & Installation</h2>
-                  <p>Get the latest version from our GitHub releases:</p>
-          
-                  <a href="https://github.com/Maxxy21/dsp-extension-hosting/releases/latest" class="github-link">
-                      📦 Download Latest Release
-                  </a>
-          
-                  <a href="https://github.com/Maxxy21/dsp-extension-hosting" class="github-link">
-                      📚 View on GitHub
-                  </a>
-              </div>
-
-              <div class="install-steps">
-                  <h3>🔧 Installation Steps:</h3>
-                  <ol>
-                      <li>Click "Download Latest Release" above</li>
-                      <li>Download the <code>.xpi</code> file from the release</li>
-                      <li>Open Firefox</li>
-                      <li>Go to <code>about:addons</code></li>
-                      <li>Click the gear icon ⚙️ in the top-right</li>
-                      <li>Select "Install Add-on From File..."</li>
-                      <li>Choose the downloaded <code>.xpi</code> file</li>
-                      <li>Click "Add" when prompted</li>
-                  </ol>
-              </div>
-
-              <div class="warning">
-                  <h3>🔄 Automatic Updates</h3>
-                  <p>Once installed, the extension will automatically check for updates. You don't need to manually download new versions.</p>
-                  <p><strong>Update server:</strong> <code>https://maxxy21.github.io/dsp-extension-hosting/updates.json</code></p>
-              </div>
-
-              <h2>📋 Features</h2>
-              <ul>
-                  <li>✅ Automatic DSP roster mismatch detection</li>
-                  <li>✅ Dual daily checks at 2:00 PM and 3:30 PM</li>
-                  <li>✅ Amazon Chime webhook notifications</li>
-                  <li>✅ Manual check functionality</li>
-                  <li>✅ Custom message broadcasting</li>
-                  <li>✅ Cross-browser compatibility</li>
-              </ul>
-
-              <h2>🔧 Configuration</h2>
-              <p>After installation, configure your DSP webhook URLs in the extension settings to receive notifications.</p>
-
-              <h2>📞 Support</h2>
-              <p>For issues or questions, please <a href="https://github.com/Maxxy21/dsp-extension-hosting/issues">create an issue on GitHub</a>.</p>
-
-              <footer style="margin-top: 40px; padding: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
-                  <p>DSP Management Extension - Open Source Firefox Extension</p>
-              </footer>
-          </body>
-          </html>
-          EOF
+          fi
 
       - name: Commit and push changes
-        if: steps.should_release.outputs.should_release == 'true'
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
         run: |
           echo "💾 Committing changes..."
           
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # Add all changes
-          git add extension/manifest.json docs/
+          # Add changes
+          git add docs/updates.json
+          
+          # Only commit manifest if version was bumped
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.version_type }}" != "use_existing" ]; then
+            git add extension/manifest.json
+          fi
           
           # Commit if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "🚀 Release v${{ steps.version.outputs.version }} [no release]
 
-            - Updated manifest.json to version ${{ steps.version.outputs.version }}
             - Updated docs/updates.json for auto-updates
-            - Updated GitHub Pages
+            $([ '${{ github.event_name }}' = 'workflow_dispatch' ] && [ '${{ github.event.inputs.version_type }}' != 'use_existing' ] && echo '- Updated manifest.json version')
           
             Auto-generated by GitHub Actions"
           
@@ -369,7 +350,7 @@ jobs:
           fi
 
       - name: Deploy to GitHub Pages
-        if: steps.should_release.outputs.should_release == 'true'
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -379,10 +360,14 @@ jobs:
       - name: Success summary
         if: steps.should_release.outputs.should_release == 'true'
         run: |
-          echo "🎉 Release v${{ steps.version.outputs.version }} completed successfully!"
-          echo ""
-          echo "📦 Release URL: https://github.com/Maxxy21/dsp-extension-hosting/releases/tag/v${{ steps.version.outputs.version }}"
-          echo "🌐 Download page: https://maxxy21.github.io/dsp-extension-hosting"
-          echo "🔄 Update manifest: https://maxxy21.github.io/dsp-extension-hosting/updates.json"
-          echo ""
-          echo "Users will receive automatic updates within 24 hours!"
+          if [ "${{ steps.check_release.outputs.release_exists }}" = "true" ]; then
+            echo "ℹ️ Release v${{ steps.version.outputs.version }} already exists, skipped"
+          else
+            echo "🎉 Release v${{ steps.version.outputs.version }} completed successfully!"
+            echo ""
+            echo "📦 Release URL: https://github.com/Maxxy21/dsp-extension-hosting/releases/tag/v${{ steps.version.outputs.version }}"
+            echo "🌐 Download page: https://maxxy21.github.io/dsp-extension-hosting"
+            echo "🔄 Update manifest: https://maxxy21.github.io/dsp-extension-hosting/updates.json"
+            echo ""
+            echo "Users will receive automatic updates within 24 hours!"
+          fi
