@@ -1,6 +1,6 @@
 # 🚀 DSP Management Extension
 
-A Firefox extension for automated DSP (Delivery Service Partner) roster management with webhook notifications and scheduling automation.
+A Firefox Add-On for automated DSP (Delivery Service Partner) roster management with webhook notifications and scheduling automation.
 
 ## 📋 Features
 

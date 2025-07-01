@@ -1,6 +1,3 @@
-// popup/popup.js - Fixed unsafe innerHTML assignments
-
-// Ensure browser polyfill is available
 if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
     var browser = chrome;
 }

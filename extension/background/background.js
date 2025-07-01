@@ -1,5 +1,3 @@
-// background/background.js - Cross-browser with polyfill
-
 async function getWebhookUrl(dspCode) {
     const { webhooks = {} } = await browser.storage.local.get('webhooks');
     return webhooks[dspCode];

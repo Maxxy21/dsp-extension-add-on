@@ -1,6 +1,3 @@
-// options/options.js - Safe implementation without innerHTML
-
-// Ensure browser polyfill is available
 if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
     var browser = chrome;
 }
