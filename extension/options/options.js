@@ -9,7 +9,7 @@ let webhookEntryCount = 0;
 // DOM elements cache
 let elements = {};
 
-// Initialize when DOM is ready
+// Initialize DOM
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('🎉 Modern options page initializing...');
 
