@@ -1,0 +1,39 @@
+{
+    "manifest_version": 3,
+    "name": "DSP Management Tool",
+    "version": "1.2",
+    "description": "DSP rostering management with automatic notifications and messaging",
+    "permissions": [
+        "alarms",
+        "storage",
+        "tabs",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "https://logistics.amazon.co.uk/*",
+        "https://hooks.chime.aws/*",
+        "https://*/*"
+    ],
+    "background": {
+        "service_worker": "background/background-v3.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://logistics.amazon.co.uk/internal/scheduling/dsps*"],
+            "js": ["content/content-v3.js"]
+        }
+    ],
+    "action": {
+        "default_popup": "popup/popup.html"
+    },
+    "options_ui": {
+        "page": "options/options.html",
+        "open_in_tab": true
+    },
+    "icons": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    }
+}

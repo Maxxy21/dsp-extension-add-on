@@ -1,0 +1,342 @@
+name: Build and Release Extension
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install -g web-ext
+
+      - name: Determine version bump
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION_TYPE="${{ github.event.inputs.version_type }}"
+          else
+            VERSION_TYPE="patch"
+          fi
+          
+          # Get current version
+          CURRENT_VERSION=$(node -p "require('./extension/manifest.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Calculate new version
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          case $VERSION_TYPE in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update manifest version
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' extension/manifest.json
+          echo "Updated manifest.json to version ${{ steps.version.outputs.version }}"
+
+      - name: Build extension
+        run: |
+          echo "🔨 Building extension..."
+          
+          # Create dist directory
+          mkdir -p dist
+          
+          # Create XPI file
+          cd extension
+          zip -r "../dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" . \
+            -x "*.log" ".DS_Store" "Thumbs.db" "*.tmp" "manifest-v3.json"
+          cd ..
+          
+          # Generate SHA256 hash
+          SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
+          echo "SHA256: $SHA256"
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          
+          # Save build info
+          cat > dist/build-info.json << EOF
+          {
+            "version": "${{ steps.version.outputs.version }}",
+            "filename": "dsp-extension-v${{ steps.version.outputs.version }}.xpi",
+            "sha256": "$SHA256",
+            "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+        id: build
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🚀 Creating GitHub release..."
+          
+          # Create release notes
+          cat > release-notes.md << EOF
+          ## DSP Management Extension v${{ steps.version.outputs.version }}
+          
+          ### 📥 Installation
+          1. Download the .xpi file below
+          2. Open Firefox and go to \`about:addons\`
+          3. Click the gear icon ⚙️ and select "Install Add-on From File..."
+          4. Choose the downloaded .xpi file
+          5. Click "Add" when prompted
+          
+          ### 🔄 Automatic Updates
+          Existing users will receive this update automatically within 24 hours.
+          
+          ### 📊 Build Information
+          - **Version**: ${{ steps.version.outputs.version }}
+          - **SHA256**: \`${{ steps.build.outputs.sha256 }}\`
+          - **Build Date**: $(date -u)
+          
+          ### 🚀 Changes in this version
+          - Enhanced functionality and bug fixes
+          - Improved performance and stability
+          
+          ---
+          *This release was automatically generated*
+          EOF
+          
+          # Create the release
+          gh release create "v${{ steps.version.outputs.version }}" \
+            "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" \
+            --title "DSP Management Extension v${{ steps.version.outputs.version }}" \
+            --notes-file release-notes.md \
+            --latest
+
+      - name: Update docs/updates.json
+        run: |
+          echo "📝 Updating updates.json..."
+          
+          # Ensure docs directory exists
+          mkdir -p docs
+          
+          # Create or update updates.json
+          cat > docs/updates.json << EOF
+          {
+            "addons": {
+              "dsp-roster-management@maxwell.com": {
+                "updates": [
+                  {
+                    "version": "${{ steps.version.outputs.version }}",
+                    "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v${{ steps.version.outputs.version }}/dsp-extension-v${{ steps.version.outputs.version }}.xpi",
+                    "update_hash": "sha256:${{ steps.build.outputs.sha256 }}",
+                    "applications": {
+                      "gecko": {
+                        "strict_min_version": "75.0"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+          EOF
+
+      - name: Update GitHub Pages
+        run: |
+          echo "🌐 Updating GitHub Pages..."
+          
+          # Create/update index.html
+          cat > docs/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>DSP Management Extension</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      max-width: 800px;
+                      margin: 0 auto;
+                      padding: 20px;
+                      line-height: 1.6;
+                      color: #333;
+                  }
+                  .header {
+                      text-align: center;
+                      margin-bottom: 40px;
+                      padding: 20px;
+                      background: #f8f9fa;
+                      border-radius: 8px;
+                  }
+                  .download-section {
+                      background: #e8f4fd;
+                      padding: 20px;
+                      border-radius: 8px;
+                      margin: 20px 0;
+                  }
+                  .github-link {
+                      display: inline-block;
+                      background: #24292e;
+                      color: white;
+                      padding: 10px 20px;
+                      border-radius: 6px;
+                      margin: 10px 5px;
+                      text-decoration: none;
+                  }
+                  .github-link:hover {
+                      background: #444d56;
+                  }
+                  .install-steps {
+                      background: #f8f9fa;
+                      padding: 20px;
+                      border-radius: 8px;
+                      margin: 20px 0;
+                  }
+                  .warning {
+                      background: #fff3cd;
+                      border: 1px solid #ffeaa7;
+                      padding: 15px;
+                      border-radius: 4px;
+                      margin: 20px 0;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="header">
+                  <h1>🚀 DSP Management Extension</h1>
+                  <p>Automated DSP rostering management with notifications for Firefox</p>
+              </div>
+
+              <div class="download-section">
+                  <h2>📥 Download & Installation</h2>
+                  <p>Get the latest version from our GitHub releases:</p>
+          
+                  <a href="https://github.com/Maxxy21/dsp-extension-hosting/releases/latest" class="github-link">
+                      📦 Download Latest Release
+                  </a>
+          
+                  <a href="https://github.com/Maxxy21/dsp-extension-hosting" class="github-link">
+                      📚 View on GitHub
+                  </a>
+              </div>
+
+              <div class="install-steps">
+                  <h3>🔧 Installation Steps:</h3>
+                  <ol>
+                      <li>Click "Download Latest Release" above</li>
+                      <li>Download the <code>.xpi</code> file from the release</li>
+                      <li>Open Firefox</li>
+                      <li>Go to <code>about:addons</code></li>
+                      <li>Click the gear icon ⚙️ in the top-right</li>
+                      <li>Select "Install Add-on From File..."</li>
+                      <li>Choose the downloaded <code>.xpi</code> file</li>
+                      <li>Click "Add" when prompted</li>
+                  </ol>
+              </div>
+
+              <div class="warning">
+                  <h3>🔄 Automatic Updates</h3>
+                  <p>Once installed, the extension will automatically check for updates. You don't need to manually download new versions.</p>
+                  <p><strong>Update server:</strong> <code>https://maxxy21.github.io/dsp-extension-hosting/updates.json</code></p>
+              </div>
+
+              <h2>📋 Features</h2>
+              <ul>
+                  <li>✅ Automatic DSP roster mismatch detection</li>
+                  <li>✅ Dual daily checks at 2:00 PM and 3:30 PM</li>
+                  <li>✅ Amazon Chime webhook notifications</li>
+                  <li>✅ Manual check functionality</li>
+                  <li>✅ Custom message broadcasting</li>
+                  <li>✅ Cross-browser compatibility</li>
+              </ul>
+
+              <h2>🔧 Configuration</h2>
+              <p>After installation, configure your DSP webhook URLs in the extension settings to receive notifications.</p>
+
+              <h2>📞 Support</h2>
+              <p>For issues or questions, please <a href="https://github.com/Maxxy21/dsp-extension-hosting/issues">create an issue on GitHub</a>.</p>
+
+              <footer style="margin-top: 40px; padding: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
+                  <p>DSP Management Extension - Open Source Firefox Extension</p>
+              </footer>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          echo "💾 Committing changes..."
+          
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Add all changes
+          git add extension/manifest.json docs/
+          
+          # Commit if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "🚀 Release v${{ steps.version.outputs.version }}
+
+            - Updated manifest.json to version ${{ steps.version.outputs.version }}
+            - Updated docs/updates.json for auto-updates
+            - Updated GitHub Pages
+          
+            Auto-generated by GitHub Actions"
+          
+            git push
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          enable_jekyll: false
+
+      - name: Success summary
+        run: |
+          echo "🎉 Release v${{ steps.version.outputs.version }} completed successfully!"
+          echo ""
+          echo "📦 Release URL: https://github.com/Maxxy21/dsp-extension-hosting/releases/tag/v${{ steps.version.outputs.version }}"
+          echo "🌐 Download page: https://maxxy21.github.io/dsp-extension-hosting"
+          echo "🔄 Update manifest: https://maxxy21.github.io/dsp-extension-hosting/updates.json"
+          echo ""
+          echo "Users will receive automatic updates within 24 hours!"

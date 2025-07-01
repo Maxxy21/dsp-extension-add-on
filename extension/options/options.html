@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSP Management Tool Settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Modern Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <h1>DSP Management Settings</h1>
+                        <p>Configure automation and webhook notifications</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <main class="main">
+            <div class="settings-grid">
+                <!-- Notification Settings Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-content">
+                            <h2>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Notification Settings
+                            </h2>
+                            <p class="card-description">Control when and how you send mismatch alerts</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="toggle-setting">
+                            <div class="toggle-info">
+                                <label class="toggle-label" for="enableNotifications">Daily Automatic Checks</label>
+                                <p class="toggle-description">Automatically check for roster mismatches at 2:00 PM daily and send notifications to configured webhooks</p>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="enableNotifications" checked>
+                                <label for="enableNotifications" class="switch"></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Webhook Configuration Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-content">
+                            <h2>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 19c-5 0-8-3-8-8s3-8 8-8 8 3 8 8-3 8-8 8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M24 12h-8m0 0l3-3m-3 3l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Webhook Configuration
+                            </h2>
+                            <p class="card-description">Set up Amazon Chime webhook URLs for each DSP to receive notifications</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div id="webhookEntries" class="webhook-list">
+                            <!-- Webhook entries will be populated here -->
+                        </div>
+                        <button id="addWebhook" class="btn btn-primary" type="button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Add New DSP Webhook
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Status Toast -->
+        <div id="status" class="toast" role="alert" aria-live="polite"></div>
+    </div>
+
+    <!-- Load scripts -->
+    <script src="../browser-polyfill.js"></script>
+    <script src="options.js"></script>
+</body>
+</html>
