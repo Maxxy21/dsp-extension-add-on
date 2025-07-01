@@ -3,6 +3,9 @@ name: Build and Release Extension
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'extension/**'          # Only trigger on extension changes
+      - 'package.json'          # Or package.json changes
   workflow_dispatch:
     inputs:
       version_type:
@@ -28,19 +31,54 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 2  # Need to compare with previous commit
+
+      - name: Check if should release
+        id: should_release
+        run: |
+          # Skip if commit message contains [skip ci] or [no release]
+          if git log -1 --pretty=%B | grep -E "\[skip ci\]|\[no release\]"; then
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "Skipping release due to commit message"
+            exit 0
+          fi
+          
+          # Skip if this is an automated commit from GitHub Actions
+          if git log -1 --pretty=%B | grep -E "🚀 Release v|Auto-update manifest"; then
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "Skipping release - this is an automated commit"
+            exit 0
+          fi
+          
+          # Check if extension files actually changed
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            # Only release if extension/ files changed
+            if git diff --name-only HEAD~1 HEAD | grep -E "^extension/|^package\.json$"; then
+              echo "should_release=true" >> $GITHUB_OUTPUT
+              echo "Extension files changed, will create release"
+            else
+              echo "should_release=false" >> $GITHUB_OUTPUT
+              echo "No extension files changed, skipping release"
+            fi
+          fi
 
       - name: Setup Node.js
+        if: steps.should_release.outputs.should_release == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
       - name: Install dependencies
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           npm install
           npm install -g web-ext
 
       - name: Determine version bump
+        if: steps.should_release.outputs.should_release == 'true'
         id: version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -79,11 +117,13 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update manifest version
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           sed -i 's/"version": "[^"]*"/"version": "${{ steps.version.outputs.version }}"/' extension/manifest.json
           echo "Updated manifest.json to version ${{ steps.version.outputs.version }}"
 
       - name: Build extension
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           echo "🔨 Building extension..."
           
@@ -93,28 +133,19 @@ jobs:
           # Create XPI file
           cd extension
           zip -r "../dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" . \
-            -x "*.log" ".DS_Store" "Thumbs.db" "*.tmp" "manifest-v3.json"
+            -x "*.log" ".DS_Store" "Thumbs.db" "*.tmp" "manifest-v3.json" "*.sh" "scripts/*"
           cd ..
           
           # Generate SHA256 hash
           SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
           echo "SHA256: $SHA256"
           echo "sha256=$SHA256" >> $GITHUB_OUTPUT
-          
-          # Save build info
-          cat > dist/build-info.json << EOF
-          {
-            "version": "${{ steps.version.outputs.version }}",
-            "filename": "dsp-extension-v${{ steps.version.outputs.version }}.xpi",
-            "sha256": "$SHA256",
-            "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          }
-          EOF
         id: build
 
       - name: Create GitHub Release
+        if: steps.should_release.outputs.should_release == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "🚀 Creating GitHub release..."
           
@@ -153,13 +184,19 @@ jobs:
             --latest
 
       - name: Update docs/updates.json
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           echo "📝 Updating updates.json..."
           
           # Ensure docs directory exists
           mkdir -p docs
           
-          # Create or update updates.json
+          # Get existing updates.json or create new structure
+          if [ -f "docs/updates.json" ]; then
+            cp docs/updates.json docs/updates.json.backup
+          fi
+          
+          # Create updated updates.json with new version
           cat > docs/updates.json << EOF
           {
             "addons": {
@@ -182,10 +219,11 @@ jobs:
           EOF
 
       - name: Update GitHub Pages
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           echo "🌐 Updating GitHub Pages..."
           
-          # Create/update index.html
+          # Create/update index.html (same as before)
           cat > docs/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -305,6 +343,7 @@ jobs:
           EOF
 
       - name: Commit and push changes
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           echo "💾 Committing changes..."
           
@@ -316,7 +355,7 @@ jobs:
           
           # Commit if there are changes
           if ! git diff --staged --quiet; then
-            git commit -m "🚀 Release v${{ steps.version.outputs.version }}
+            git commit -m "🚀 Release v${{ steps.version.outputs.version }} [no release]
 
             - Updated manifest.json to version ${{ steps.version.outputs.version }}
             - Updated docs/updates.json for auto-updates
@@ -330,6 +369,7 @@ jobs:
           fi
 
       - name: Deploy to GitHub Pages
+        if: steps.should_release.outputs.should_release == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -337,6 +377,7 @@ jobs:
           enable_jekyll: false
 
       - name: Success summary
+        if: steps.should_release.outputs.should_release == 'true'
         run: |
           echo "🎉 Release v${{ steps.version.outputs.version }} completed successfully!"
           echo ""
