@@ -1,6 +1,6 @@
 {
   "addons": {
-    "dsp-roster-management@maxwell.com": {
+    "{dsp-roster-management@maxwell.com}": {
       "updates": [
         {
           "version": "1.2.0",
