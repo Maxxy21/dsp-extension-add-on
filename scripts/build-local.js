@@ -3,7 +3,7 @@ const path = require('path');
 const archiver = require('archiver');
 const crypto = require('crypto');
 
-console.log('🔨 Building extension locally...');
+console.log('🔨 Building extension with dual manifests...');
 
 // Configuration
 const CONFIG = {
@@ -49,31 +49,11 @@ async function buildExtension() {
 
         console.log(`📦 Building version ${version}`);
 
-        // Create XPI file
-        const xpiPath = path.join(CONFIG.outputDir, `dsp-extension-v${version}.xpi`);
-        await createXPI(CONFIG.sourceDir, xpiPath);
+        // Create both self-hosted and Mozilla-signed versions
+        await createSelfHostedVersion(version, manifest);
+        await createMozillaVersion(version, manifest);
 
-        // Generate SHA256 hash
-        const hash = await generateSHA256(xpiPath);
-        const hashPath = path.join(CONFIG.outputDir, `dsp-extension-v${version}.sha256`);
-        fs.writeFileSync(hashPath, hash);
-
-        console.log(`✅ Built: ${xpiPath}`);
-        console.log(`🔐 SHA256: ${hash}`);
-        console.log(`💾 Hash saved: ${hashPath}`);
-
-        // Create build info
-        const buildInfo = {
-            version,
-            filename: `dsp-extension-v${version}.xpi`,
-            sha256: hash,
-            buildDate: new Date().toISOString(),
-            size: fs.statSync(xpiPath).size
-        };
-
-        const buildInfoPath = path.join(CONFIG.outputDir, 'build-info.json');
-        fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));
-        console.log(`📋 Build info saved: ${buildInfoPath}`);
+        console.log('✅ Build completed successfully!');
 
     } catch (error) {
         console.error('❌ Build failed:', error.message);
@@ -81,9 +61,61 @@ async function buildExtension() {
     }
 }
 
-function createXPI(sourceDir, outputPath) {
+async function createSelfHostedVersion(version, manifest) {
+    console.log('🌐 Creating self-hosted version (with update_url)...');
+
+    // Ensure self-hosted manifest has update_url
+    const selfHostedManifest = {
+        ...manifest,
+        browser_specific_settings: {
+            gecko: {
+                id: "dsp-roster-management@maxwell.com",
+                strict_min_version: "75.0",
+                update_url: "https://maxxy21.github.io/dsp-extension-hosting/updates.json"
+            }
+        }
+    };
+
+    const xpiPath = path.join(CONFIG.outputDir, `dsp-extension-v${version}.xpi`);
+    await createXPI(CONFIG.sourceDir, xpiPath, selfHostedManifest);
+
+    const hash = await generateSHA256(xpiPath);
+    const hashPath = path.join(CONFIG.outputDir, `dsp-extension-v${version}.sha256`);
+    fs.writeFileSync(hashPath, hash);
+
+    console.log(`✅ Self-hosted version: ${xpiPath}`);
+    console.log(`🔐 SHA256: ${hash}`);
+}
+
+async function createMozillaVersion(version, manifest) {
+    console.log('🦊 Creating Mozilla-signed version (no update_url)...');
+
+    // Remove update_url for Mozilla signing
+    const mozillaManifest = {
+        ...manifest,
+        browser_specific_settings: {
+            gecko: {
+                id: "dsp-roster-management@maxwell.com",
+                strict_min_version: "75.0"
+                // No update_url for Mozilla signing
+            }
+        }
+    };
+
+    const xpiPath = path.join(CONFIG.outputDir, `dsp-extension-v${version}-mozilla.xpi`);
+    await createXPI(CONFIG.sourceDir, xpiPath, mozillaManifest);
+
+    const hash = await generateSHA256(xpiPath);
+    const hashPath = path.join(CONFIG.outputDir, `dsp-extension-v${version}-mozilla.sha256`);
+    fs.writeFileSync(hashPath, hash);
+
+    console.log(`✅ Mozilla version: ${xpiPath}`);
+    console.log(`🔐 SHA256: ${hash}`);
+}
+
+function createXPI(sourceDir, outputPath, customManifest = null) {
     return new Promise((resolve, reject) => {
-        console.log('🗜️  Creating XPI archive...');
+        console.log(`🗜️  Creating XPI: ${path.basename(outputPath)}`);
 
         const output = fs.createWriteStream(outputPath);
         const archive = archiver('zip', {
@@ -101,11 +133,18 @@ function createXPI(sourceDir, outputPath) {
 
         archive.pipe(output);
 
-        // Add files to archive with filtering
+        // Add all files except manifest.json first
         archive.glob('**/*', {
             cwd: sourceDir,
-            ignore: CONFIG.excludePatterns
+            ignore: [...CONFIG.excludePatterns, 'manifest.json']
         });
+
+        // Add custom manifest or original
+        if (customManifest) {
+            archive.append(JSON.stringify(customManifest, null, 2), { name: 'manifest.json' });
+        } else {
+            archive.file(path.join(sourceDir, 'manifest.json'), { name: 'manifest.json' });
+        }
 
         archive.finalize();
     });

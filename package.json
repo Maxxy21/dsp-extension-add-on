@@ -1,6 +1,6 @@
 {
   "name": "dsp-extension-cicd",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "CI/CD pipeline for DSP Management Extension",
   "scripts": {
     "dev": "web-ext run --source-dir=./extension --browser-console",
@@ -11,7 +11,9 @@
     "version:minor": "npm version minor --no-git-tag-version && node scripts/update-manifest.js",
     "version:major": "npm version major --no-git-tag-version && node scripts/update-manifest.js",
     "clean": "rimraf dist",
-    "prebuild": "npm run clean"
+    "prebuild": "npm run clean",
+    "build:mozilla": "echo 'Mozilla version created automatically with build command'",
+    "sign:mozilla": "web-ext sign --source-dir=./extension --channel=unlisted --artifacts-dir=./dist"
   },
   "devDependencies": {
     "archiver": "^5.3.2",

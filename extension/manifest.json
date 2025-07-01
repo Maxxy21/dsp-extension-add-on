@@ -1,9 +1,8 @@
 {
   "manifest_version": 2,
   "name": "DSP Roster Management Tool",
-  "version": "1.4.3",
+  "version": "1.4.6",
   "description": "DSP rostering management with automatic notifications and messaging. Cross-browser compatible.",
-
   "permissions": [
     "alarms",
     "storage",
@@ -13,7 +12,6 @@
     "https://hooks.chime.aws/*",
     "https://*/*"
   ],
-
   "background": {
     "scripts": [
       "browser-polyfill.js",
@@ -21,10 +19,11 @@
     ],
     "persistent": false
   },
-
   "content_scripts": [
     {
-      "matches": ["https://logistics.amazon.co.uk/internal/scheduling/dsps*"],
+      "matches": [
+        "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
+      ],
       "js": [
         "browser-polyfill.js",
         "content/content.js"
@@ -32,7 +31,6 @@
       "run_at": "document_end"
     }
   ],
-
   "browser_action": {
     "default_popup": "popup/popup.html",
     "default_title": "DSP Roster Management",
@@ -43,12 +41,10 @@
       "128": "icons/icon128.png"
     }
   },
-
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
   },
-
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -57,21 +53,17 @@
     "96": "icons/icon96.png",
     "128": "icons/icon128.png"
   },
-
   "web_accessible_resources": [
     "options/*",
     "popup/*",
     "icons/*"
   ],
-
   "browser_specific_settings": {
     "gecko": {
       "id": "dsp-roster-management@maxwell.com",
-      "strict_min_version": "75.0",
-      "update_url": "https://maxxy21.github.io/dsp-extension-hosting/updates.json"
+      "strict_min_version": "75.0"
     }
   },
-
   "author": "Maxwell Aboagye",
   "homepage_url": "https://github.com/Maxxy21/dsp-extension-hosting"
 }
