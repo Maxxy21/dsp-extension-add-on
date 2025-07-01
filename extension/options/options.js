@@ -6,7 +6,7 @@ if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
 let isLoading = false;
 let webhookEntryCount = 0;
 
-// DOM elements cache
+// DOM elements Cache
 let elements = {};
 
 // Initialize DOM
