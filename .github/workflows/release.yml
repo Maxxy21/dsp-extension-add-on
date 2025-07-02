@@ -6,6 +6,7 @@ on:
     paths:
       - 'extension/**'          # Only trigger on extension changes
       - 'package.json'          # Or package.json changes
+      - 'scripts/**'            # Or build script changes
   workflow_dispatch:
     inputs:
       version_type:
@@ -57,7 +58,7 @@ jobs:
             echo "should_release=true" >> $GITHUB_OUTPUT
           else
             # Only release if extension/ files changed
-            if git diff --name-only HEAD~1 HEAD | grep -E "^extension/|^package\.json$"; then
+            if git diff --name-only HEAD~1 HEAD | grep -E "^extension/|^package\.json$|^scripts/"; then
               echo "should_release=true" >> $GITHUB_OUTPUT
               echo "Extension files changed, will create release"
             else
@@ -71,11 +72,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
         if: steps.should_release.outputs.should_release == 'true'
         run: |
-          npm install
+          npm ci
           npm install -g web-ext
 
       - name: Determine version
@@ -90,35 +92,23 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.version_type }}" != "use_existing" ]; then
             VERSION_TYPE="${{ github.event.inputs.version_type }}"
             echo "Manual version bump requested: $VERSION_TYPE"
-          
-            # Calculate new version
-            IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-            MAJOR=${VERSION_PARTS[0]}
-            MINOR=${VERSION_PARTS[1]}
-            PATCH=${VERSION_PARTS[2]}
-          
+            
+            # Use npm scripts to bump version
             case $VERSION_TYPE in
               "major")
-                MAJOR=$((MAJOR + 1))
-                MINOR=0
-                PATCH=0
+                npm run version:major
                 ;;
               "minor")
-                MINOR=$((MINOR + 1))
-                PATCH=0
+                npm run version:minor
                 ;;
               "patch")
-                PATCH=$((PATCH + 1))
+                npm run version:patch
                 ;;
             esac
-          
-            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-            echo "Calculated new version: $NEW_VERSION"
-          
-            # Update manifest with new version
-            sed -i 's/"version": "[^"]*"/"version": "'$NEW_VERSION'"/' extension/manifest.json
-            echo "Updated manifest.json to version $NEW_VERSION"
-          
+            
+            # Get new version after bump
+            NEW_VERSION=$(node -p "require('./extension/manifest.json').version")
+            echo "Version bumped to: $NEW_VERSION"
             echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           else
             # Use existing version from manifest (no auto-increment)
@@ -143,21 +133,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build extension
+      - name: Build extension with npm
         if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
         run: |
-          echo "🔨 Building extension..."
+          echo "🔨 Building extension with npm build script..."
           
-          # Create dist directory
-          mkdir -p dist
+          # Use your npm build script
+          npm run build
           
-          # Create unsigned XPI file first
-          cd extension
-          zip -r "../dist/dsp-extension-v${{ steps.version.outputs.version }}-unsigned.xpi" . \
-            -x "*.log" ".DS_Store" "Thumbs.db" "*.tmp" "manifest-v3.json" "*.sh" "scripts/*"
-          cd ..
+          # List what was created
+          echo "📦 Build artifacts:"
+          ls -la dist/
           
-          echo "📦 Created unsigned version"
+          # Get the version for filename detection
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Check if signed version exists (from your build script)
+          if [ -f "dist/dsp-extension-v$VERSION.xpi" ]; then
+            echo "✅ Main XPI found: dsp-extension-v$VERSION.xpi"
+          fi
+          
+          # Check if Mozilla-specific version exists
+          if [ -f "dist/dsp-extension-v$VERSION-mozilla.xpi" ]; then
+            echo "✅ Mozilla XPI found: dsp-extension-v$VERSION-mozilla.xpi"
+          fi
+          
+          # Check if unsigned version exists
+          if [ -f "dist/dsp-extension-v$VERSION-unsigned.xpi" ]; then
+            echo "📦 Unsigned XPI found: dsp-extension-v$VERSION-unsigned.xpi"
+          fi
         id: build
 
       - name: Sign extension with Mozilla
@@ -166,45 +170,126 @@ jobs:
           WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
           WEB_EXT_API_SECRET: ${{ secrets.WEB_EXT_API_SECRET }}
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
           if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
             echo "🔏 Signing extension with Mozilla..."
-          
-            cd extension
-            web-ext sign \
-              --api-key="$WEB_EXT_API_KEY" \
-              --api-secret="$WEB_EXT_API_SECRET" \
-              --channel=unlisted \
-              --artifacts-dir=../dist \
-              --timeout=600000
-            cd ..
-          
-            # Find the signed XPI and rename it
-            SIGNED_XPI=$(find dist -name "*.xpi" -not -name "*unsigned*" | head -1)
-            if [ -n "$SIGNED_XPI" ]; then
-              mv "$SIGNED_XPI" "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi"
-              echo "✅ Extension signed successfully"
-          
-              # Generate SHA256 hash of signed version
-              SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
-              echo "SHA256: $SHA256"
-              echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+            
+            # Use Mozilla-specific version if it exists, otherwise use main version
+            if [ -f "dist/dsp-extension-v$VERSION-mozilla.xpi" ]; then
+              echo "📦 Using Mozilla-specific build for signing"
+              
+              # Extract the Mozilla version to temp directory for signing
+              mkdir -p temp-mozilla
+              cd temp-mozilla
+              unzip "../dist/dsp-extension-v$VERSION-mozilla.xpi"
+              
+              # Sign using web-ext
+              if web-ext sign \
+                --api-key="$WEB_EXT_API_KEY" \
+                --api-secret="$WEB_EXT_API_SECRET" \
+                --channel=unlisted \
+                --artifacts-dir=../dist \
+                --timeout=600000; then
+                
+                echo "✅ Extension signed successfully"
+                cd ..
+                
+                # Find the signed XPI and rename it
+                SIGNED_XPI=$(find dist -name "*.xpi" -newer temp-mozilla | head -1)
+                if [ -n "$SIGNED_XPI" ]; then
+                  mv "$SIGNED_XPI" "dist/dsp-extension-v$VERSION.xpi"
+                  echo "📦 Signed XPI ready: dsp-extension-v$VERSION.xpi"
+                  
+                  # Generate SHA256 hash of signed version
+                  SHA256=$(sha256sum "dist/dsp-extension-v$VERSION.xpi" | cut -d' ' -f1)
+                  echo "🔐 SHA256: $SHA256"
+                  echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+                  echo "signed=true" >> $GITHUB_OUTPUT
+                else
+                  echo "❌ Signed XPI not found after successful signing"
+                  # Fallback to unsigned version
+                  if [ -f "dist/dsp-extension-v$VERSION-unsigned.xpi" ]; then
+                    cp "dist/dsp-extension-v$VERSION-unsigned.xpi" "dist/dsp-extension-v$VERSION.xpi"
+                  fi
+                  SHA256=$(sha256sum "dist/dsp-extension-v$VERSION.xpi" | cut -d' ' -f1)
+                  echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+                  echo "signed=false" >> $GITHUB_OUTPUT
+                fi
+                
+                # Clean up
+                rm -rf temp-mozilla
+              else
+                echo "⚠️ Mozilla signing failed, checking if version already exists..."
+                cd ..
+                rm -rf temp-mozilla
+                
+                # Use the existing build (could be signed or unsigned)
+                if [ -f "dist/dsp-extension-v$VERSION.xpi" ]; then
+                  SHA256=$(sha256sum "dist/dsp-extension-v$VERSION.xpi" | cut -d' ' -f1)
+                elif [ -f "dist/dsp-extension-v$VERSION-unsigned.xpi" ]; then
+                  cp "dist/dsp-extension-v$VERSION-unsigned.xpi" "dist/dsp-extension-v$VERSION.xpi"
+                  SHA256=$(sha256sum "dist/dsp-extension-v$VERSION.xpi" | cut -d' ' -f1)
+                fi
+                
+                echo "🔐 SHA256: $SHA256"
+                echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+                echo "signed=mozilla_existing" >> $GITHUB_OUTPUT
+                echo "ℹ️ Note: This version may already be signed by Mozilla"
+              fi
             else
-              echo "❌ Signed XPI not found, using unsigned version"
-              mv "dist/dsp-extension-v${{ steps.version.outputs.version }}-unsigned.xpi" "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi"
-          
-              # Generate SHA256 hash of unsigned version
-              SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
-              echo "SHA256: $SHA256"
-              echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+              echo "📦 Using main extension build for signing"
+              
+              # Extract main version for signing
+              mkdir -p temp-signing
+              cd temp-signing
+              
+              if [ -f "../dist/dsp-extension-v$VERSION.xpi" ]; then
+                unzip "../dist/dsp-extension-v$VERSION.xpi"
+              else
+                echo "❌ No XPI file found to sign"
+                exit 1
+              fi
+              
+              # Sign using web-ext
+              web-ext sign \
+                --api-key="$WEB_EXT_API_KEY" \
+                --api-secret="$WEB_EXT_API_SECRET" \
+                --channel=unlisted \
+                --artifacts-dir=../dist \
+                --timeout=600000
+              
+              cd ..
+              rm -rf temp-signing
+              
+              # Find and process signed XPI
+              SIGNED_XPI=$(find dist -name "*.xpi" -newer . | head -1)
+              if [ -n "$SIGNED_XPI" ]; then
+                mv "$SIGNED_XPI" "dist/dsp-extension-v$VERSION.xpi"
+                SHA256=$(sha256sum "dist/dsp-extension-v$VERSION.xpi" | cut -d' ' -f1)
+                echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+                echo "signed=true" >> $GITHUB_OUTPUT
+              fi
             fi
           else
-            echo "⚠️ Mozilla API credentials not set, using unsigned version"
-            mv "dist/dsp-extension-v${{ steps.version.outputs.version }}-unsigned.xpi" "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi"
-          
+            echo "⚠️ Mozilla API credentials not set, using existing build"
+            
+            # Use whatever build exists
+            if [ -f "dist/dsp-extension-v$VERSION.xpi" ]; then
+              echo "📦 Using existing XPI: dsp-extension-v$VERSION.xpi"
+            elif [ -f "dist/dsp-extension-v$VERSION-unsigned.xpi" ]; then
+              echo "📦 Using unsigned XPI"
+              cp "dist/dsp-extension-v$VERSION-unsigned.xpi" "dist/dsp-extension-v$VERSION.xpi"
+            else
+              echo "❌ No XPI file found in dist/"
+              exit 1
+            fi
+            
             # Generate SHA256 hash
-            SHA256=$(sha256sum "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" | cut -d' ' -f1)
-            echo "SHA256: $SHA256"
+            SHA256=$(sha256sum "dist/dsp-extension-v$VERSION.xpi" | cut -d' ' -f1)
+            echo "🔐 SHA256: $SHA256"
             echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+            echo "signed=false" >> $GITHUB_OUTPUT
           fi
         id: sign
 
@@ -215,23 +300,46 @@ jobs:
         run: |
           echo "🚀 Creating GitHub release..."
           
-          # Determine if extension is signed
-          if [ -n "${{ secrets.WEB_EXT_API_KEY }}" ] && [ -n "${{ secrets.WEB_EXT_API_SECRET }}" ]; then
-            SIGNED_STATUS="✅ Mozilla Signed"
-          else
-            SIGNED_STATUS="⚠️ Unsigned (requires about:debugging installation)"
-          fi
+          # Determine signing status for release notes
+          case "${{ steps.sign.outputs.signed }}" in
+            "true")
+              SIGNED_STATUS="✅ Mozilla Signed (Fresh)"
+              INSTALL_NOTE="This extension is signed by Mozilla and will install without warnings."
+              ;;
+            "mozilla_existing")
+              SIGNED_STATUS="✅ Mozilla Signed (Previously)"
+              INSTALL_NOTE="This version is already signed by Mozilla. The signed version is available through Firefox's automatic updates."
+              ;;
+            "false")
+              SIGNED_STATUS="⚠️ Unsigned"
+              INSTALL_NOTE="This extension is unsigned. Install via about:debugging → Load Temporary Add-on for testing."
+              ;;
+            *)
+              SIGNED_STATUS="❓ Unknown"
+              INSTALL_NOTE="Installation status unknown."
+              ;;
+          esac
           
           # Create release notes
           cat > release-notes.md << EOF
           ## DSP Management Extension v${{ steps.version.outputs.version }}
           
           ### 📥 Installation
+          $INSTALL_NOTE
+          
+          **Standard Installation:**
           1. Download the .xpi file below
           2. Open Firefox and go to \`about:addons\`
           3. Click the gear icon ⚙️ and select "Install Add-on From File..."
           4. Choose the downloaded .xpi file
           5. Click "Add" when prompted
+          
+          **Development Installation (if unsigned):**
+          1. Download the .xpi file below
+          2. Go to \`about:debugging\` in Firefox
+          3. Click "This Firefox"
+          4. Click "Load Temporary Add-on..."
+          5. Select the downloaded .xpi file
           
           ### 🔄 Automatic Updates
           Existing users will receive this update automatically within 24 hours.
@@ -241,13 +349,14 @@ jobs:
           - **Status**: $SIGNED_STATUS
           - **SHA256**: \`${{ steps.sign.outputs.sha256 }}\`
           - **Build Date**: $(date -u)
+          - **Built with**: NPM build system
           
           ### 🚀 Changes in this version
           - Enhanced functionality and bug fixes
           - Improved performance and stability
           
           ---
-          *This release was automatically generated*
+          *This release was automatically generated using NPM build scripts*
           EOF
           
           # Create the release
@@ -281,18 +390,18 @@ jobs:
                   }
                 }
               };
-          
+              
               // Remove existing version if present
               updates.addons['dsp-roster-management@maxwell.com'].updates = 
                 updates.addons['dsp-roster-management@maxwell.com'].updates.filter(u => u.version !== '${{ steps.version.outputs.version }}');
-          
+              
               // Add new version
               updates.addons['dsp-roster-management@maxwell.com'].updates.push(newUpdate);
-          
+              
               // Sort by version
               updates.addons['dsp-roster-management@maxwell.com'].updates.sort((a, b) => 
                 a.version.localeCompare(b.version, undefined, { numeric: true }));
-          
+              
               fs.writeFileSync('docs/updates.json', JSON.stringify(updates, null, 2));
             "
           else
@@ -332,7 +441,7 @@ jobs:
           
           # Only commit manifest if version was bumped
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.version_type }}" != "use_existing" ]; then
-            git add extension/manifest.json
+            git add extension/manifest.json package.json
           fi
           
           # Commit if there are changes
@@ -340,10 +449,10 @@ jobs:
             git commit -m "🚀 Release v${{ steps.version.outputs.version }} [no release]
 
             - Updated docs/updates.json for auto-updates
-            $([ '${{ github.event_name }}' = 'workflow_dispatch' ] && [ '${{ github.event.inputs.version_type }}' != 'use_existing' ] && echo '- Updated manifest.json version')
-          
+            $([ '${{ github.event_name }}' = 'workflow_dispatch' ] && [ '${{ github.event.inputs.version_type }}' != 'use_existing' ] && echo '- Updated version numbers')
+            
             Auto-generated by GitHub Actions"
-          
+            
             git push
           else
             echo "No changes to commit"
@@ -368,6 +477,9 @@ jobs:
             echo "📦 Release URL: https://github.com/Maxxy21/dsp-extension-hosting/releases/tag/v${{ steps.version.outputs.version }}"
             echo "🌐 Download page: https://maxxy21.github.io/dsp-extension-hosting"
             echo "🔄 Update manifest: https://maxxy21.github.io/dsp-extension-hosting/updates.json"
+            echo ""
+            echo "🔨 Built with: NPM build system"
+            echo "📊 Signing status: ${{ steps.sign.outputs.signed }}"
             echo ""
             echo "Users will receive automatic updates within 24 hours!"
           fi
