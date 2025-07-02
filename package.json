@@ -1,6 +1,6 @@
 {
   "name": "dsp-extension-cicd",
-  "version": "1.4.12",
+  "version": "1.4.14",
   "description": "CI/CD pipeline for DSP Management Extension",
   "scripts": {
     "dev": "web-ext run --source-dir=./extension --browser-console",
