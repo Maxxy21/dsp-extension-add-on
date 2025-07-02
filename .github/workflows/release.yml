@@ -72,12 +72,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
+          # Remove cache since we don't have package-lock.json
 
       - name: Install dependencies
         if: steps.should_release.outputs.should_release == 'true'
         run: |
-          npm ci
+          # Check if package-lock.json exists, use npm ci if it does, npm install if not
+          if [ -f "package-lock.json" ]; then
+            echo "📦 Using npm ci (package-lock.json found)"
+            npm ci
+          else
+            echo "📦 Using npm install (no package-lock.json found)"
+            npm install
+          fi
           npm install -g web-ext
 
       - name: Determine version
