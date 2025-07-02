@@ -7,6 +7,7 @@ on:
       - 'extension/**'          # Only trigger on extension changes
       - 'package.json'          # Or package.json changes
       - 'scripts/**'            # Or build script changes
+      - 'RELEASE_NOTES.md'      # Or release notes changes
   workflow_dispatch:
     inputs:
       version_type:
@@ -58,7 +59,7 @@ jobs:
             echo "should_release=true" >> $GITHUB_OUTPUT
           else
             # Only release if extension/ files changed
-            if git diff --name-only HEAD~1 HEAD | grep -E "^extension/|^package\.json$|^scripts/"; then
+            if git diff --name-only HEAD~1 HEAD | grep -E "^extension/|^package\.json$|^scripts/|^RELEASE_NOTES\.md$"; then
               echo "should_release=true" >> $GITHUB_OUTPUT
               echo "Extension files changed, will create release"
             else
@@ -72,7 +73,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          # Remove cache since we don't have package-lock.json
 
       - name: Install dependencies
         if: steps.should_release.outputs.should_release == 'true'
@@ -139,6 +139,77 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare release notes
+        if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          echo "📝 Preparing release notes..."
+          
+          # Check if custom RELEASE_NOTES.md exists
+          if [ -f "RELEASE_NOTES.md" ]; then
+            echo "📋 Using custom RELEASE_NOTES.md"
+            
+            # Extract content for this version or use entire file
+            if grep -q "## Version $VERSION" RELEASE_NOTES.md; then
+              echo "✅ Found specific notes for version $VERSION"
+              # Extract section for this version
+              sed -n "/## Version $VERSION/,/## Version \|---$/p" RELEASE_NOTES.md | sed '$ { /^---$/d; }' > temp_release_notes.md
+            else
+              echo "📄 Using entire RELEASE_NOTES.md file"
+              # Use the entire file but update version number
+              sed "s/## Version [0-9]\+\.[0-9]\+\.[0-9]\+/## DSP Management Extension v$VERSION/" RELEASE_NOTES.md > temp_release_notes.md
+            fi
+            
+            # Ensure it starts with version header
+            if ! grep -q "^## DSP Management Extension v$VERSION" temp_release_notes.md; then
+              echo "## DSP Management Extension v$VERSION" > final_release_notes.md
+              echo "" >> final_release_notes.md
+              cat temp_release_notes.md >> final_release_notes.md
+            else
+              cp temp_release_notes.md final_release_notes.md
+            fi
+            
+            rm -f temp_release_notes.md
+            
+          else
+            echo "📋 RELEASE_NOTES.md not found, generating default release notes"
+            
+            # Generate default release notes
+            cat > final_release_notes.md << EOF
+          ## DSP Management Extension v$VERSION
+          
+          ### 🚀 Changes in this version
+          - Enhanced functionality and bug fixes
+          - Improved performance and stability
+          
+          ### 📥 Installation
+          **Standard Installation:**
+          1. Download the .xpi file below
+          2. Open Firefox and go to \`about:addons\`
+          3. Click the gear icon ⚙️ and select "Install Add-on From File..."
+          4. Choose the downloaded .xpi file
+          5. Click "Add" when prompted
+          
+          **Development Installation (if unsigned):**
+          1. Download the .xpi file below
+          2. Go to \`about:debugging\` in Firefox
+          3. Click "This Firefox"
+          4. Click "Load Temporary Add-on..."
+          5. Select the downloaded .xpi file
+          
+          ### 🔄 Automatic Updates
+          Existing users will receive this update automatically within 24 hours.
+          
+          ### 🔧 Configuration
+          After installation, configure your DSP webhook URLs in the extension settings to receive notifications.
+          EOF
+          fi
+          
+          echo "✅ Release notes prepared"
+          echo "release_notes_file=final_release_notes.md" >> $GITHUB_OUTPUT
 
       - name: Build extension with npm
         if: steps.should_release.outputs.should_release == 'true' && steps.check_release.outputs.release_exists == 'false'
@@ -307,70 +378,45 @@ jobs:
         run: |
           echo "🚀 Creating GitHub release..."
           
+          VERSION="${{ steps.version.outputs.version }}"
+          
           # Determine signing status for release notes
           case "${{ steps.sign.outputs.signed }}" in
             "true")
               SIGNED_STATUS="✅ Mozilla Signed (Fresh)"
-              INSTALL_NOTE="This extension is signed by Mozilla and will install without warnings."
               ;;
             "mozilla_existing")
               SIGNED_STATUS="✅ Mozilla Signed (Previously)"
-              INSTALL_NOTE="This version is already signed by Mozilla. The signed version is available through Firefox's automatic updates."
               ;;
             "false")
               SIGNED_STATUS="⚠️ Unsigned"
-              INSTALL_NOTE="This extension is unsigned. Install via about:debugging → Load Temporary Add-on for testing."
               ;;
             *)
               SIGNED_STATUS="❓ Unknown"
-              INSTALL_NOTE="Installation status unknown."
               ;;
           esac
           
-          # Create release notes
-          cat > release-notes.md << EOF
-          ## DSP Management Extension v${{ steps.version.outputs.version }}
+          # Add build information to the release notes
+          cat >> ${{ steps.release_notes.outputs.release_notes_file }} << EOF
           
-          ### 📥 Installation
-          $INSTALL_NOTE
-          
-          **Standard Installation:**
-          1. Download the .xpi file below
-          2. Open Firefox and go to \`about:addons\`
-          3. Click the gear icon ⚙️ and select "Install Add-on From File..."
-          4. Choose the downloaded .xpi file
-          5. Click "Add" when prompted
-          
-          **Development Installation (if unsigned):**
-          1. Download the .xpi file below
-          2. Go to \`about:debugging\` in Firefox
-          3. Click "This Firefox"
-          4. Click "Load Temporary Add-on..."
-          5. Select the downloaded .xpi file
-          
-          ### 🔄 Automatic Updates
-          Existing users will receive this update automatically within 24 hours.
+          ---
           
           ### 📊 Build Information
-          - **Version**: ${{ steps.version.outputs.version }}
+          - **Version**: $VERSION
           - **Status**: $SIGNED_STATUS
           - **SHA256**: \`${{ steps.sign.outputs.sha256 }}\`
           - **Build Date**: $(date -u)
           - **Built with**: NPM build system
           
-          ### 🚀 Changes in this version
-          - Enhanced functionality and bug fixes
-          - Improved performance and stability
-          
           ---
-          *This release was automatically generated using NPM build scripts*
+          *This release was automatically generated using custom release notes*
           EOF
           
-          # Create the release
-          gh release create "v${{ steps.version.outputs.version }}" \
-            "dist/dsp-extension-v${{ steps.version.outputs.version }}.xpi" \
-            --title "DSP Management Extension v${{ steps.version.outputs.version }}" \
-            --notes-file release-notes.md \
+          # Create the release using the prepared notes
+          gh release create "v$VERSION" \
+            "dist/dsp-extension-v$VERSION.xpi" \
+            --title "DSP Management Extension v$VERSION" \
+            --notes-file "${{ steps.release_notes.outputs.release_notes_file }}" \
             --latest
 
       - name: Update docs/updates.json
@@ -451,6 +497,9 @@ jobs:
             git add extension/manifest.json package.json
           fi
           
+          # Clean up release notes file
+          rm -f final_release_notes.md
+          
           # Commit if there are changes
           if ! git diff --staged --quiet; then
             git commit -m "🚀 Release v${{ steps.version.outputs.version }} [no release]
@@ -487,6 +536,7 @@ jobs:
             echo ""
             echo "🔨 Built with: NPM build system"
             echo "📊 Signing status: ${{ steps.sign.outputs.signed }}"
+            echo "📝 Release notes: Custom RELEASE_NOTES.md used"
             echo ""
             echo "Users will receive automatic updates within 24 hours!"
           fi
