@@ -1,3 +1,5 @@
+// background/background.js - Cross-browser with polyfill and dual alarms
+
 async function getWebhookUrl(dspCode) {
     const { webhooks = {} } = await browser.storage.local.get('webhooks');
     return webhooks[dspCode];
@@ -8,53 +10,63 @@ async function getNotificationSettings() {
     return notificationsEnabled;
 }
 
-// Set up alarm for 14:00 daily
+// Set up alarms for 14:00 and 15:30 daily
 browser.runtime.onInstalled.addListener(async () => {
     const notificationsEnabled = await getNotificationSettings();
     if (notificationsEnabled) {
-        await createDailyAlarm();
+        await createDailyAlarms();
     }
     console.log('DSP Management Tool installed, notifications:', notificationsEnabled ? 'enabled' : 'disabled');
 });
 
-async function createDailyAlarm() {
-    // Clear existing alarm first
-    await browser.alarms.clear('checkDSP');
-    
-    // Create new alarm
-    await browser.alarms.create('checkDSP', {
-        when: getNextAlarmTime(),
+async function createDailyAlarms() {
+    // Clear existing alarms first
+    await browser.alarms.clear('checkDSP_14');
+    await browser.alarms.clear('checkDSP_1530');
+
+    // Create 2:00 PM alarm
+    await browser.alarms.create('checkDSP_14', {
+        when: getNextAlarmTime(14, 0),
         periodInMinutes: 24 * 60 // Daily
     });
-    console.log('Daily alarm created for 14:00');
+    console.log('Daily alarm created for 14:00 (2:00 PM)');
+
+    // Create 3:30 PM alarm
+    await browser.alarms.create('checkDSP_1530', {
+        when: getNextAlarmTime(15, 30),
+        periodInMinutes: 24 * 60 // Daily
+    });
+    console.log('Daily alarm created for 15:30 (3:30 PM)');
 }
 
-async function clearDailyAlarm() {
-    await browser.alarms.clear('checkDSP');
-    console.log('Daily alarm cleared');
+async function clearDailyAlarms() {
+    await browser.alarms.clear('checkDSP_14');
+    await browser.alarms.clear('checkDSP_1530');
+    console.log('Daily alarms cleared');
 }
 
-function getNextAlarmTime() {
+function getNextAlarmTime(hours, minutes) {
     const now = new Date();
     const next = new Date(now);
-    next.setHours(14, 0, 0, 0);
+    next.setHours(hours, minutes, 0, 0);
     if (next <= now) {
         next.setDate(next.getDate() + 1);
     }
     return next.getTime();
 }
 
-// Handle alarm
+// Handle alarms
 browser.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === 'checkDSP') {
+    if (alarm.name === 'checkDSP_14' || alarm.name === 'checkDSP_1530') {
         // Double-check if notifications are still enabled
         const notificationsEnabled = await getNotificationSettings();
         if (notificationsEnabled) {
-            console.log('DSP check alarm triggered');
+            const time = alarm.name === 'checkDSP_14' ? '14:00' : '15:30';
+            console.log(`DSP check alarm triggered at ${time}`);
             await checkDSPMismatches();
         } else {
             console.log('DSP check alarm triggered but notifications are disabled');
-            await clearDailyAlarm();
+            await clearDailyAlarms();
         }
     }
 });
@@ -63,18 +75,17 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
 browser.runtime.onMessage.addListener(async (request, sender) => {
     try {
         console.log('Background received message:', request);
-        
+
         if (request.action === "manualCheck") {
             await checkDSPMismatches();
             return { success: true };
         } else if (request.action === "sendMessage") {
-            const result = await sendWebhookMessage(request.dsp, request.message);
-            return result;
+            return await sendWebhookMessage(request.dsp, request.message);
         } else if (request.action === "updateNotificationSettings") {
             await updateNotificationSettings(request.enabled);
             return { success: true };
         }
-        
+
         return { success: false, error: 'Unknown action' };
     } catch (error) {
         console.error(`Error handling ${request.action}:`, error);
@@ -85,10 +96,10 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
 async function updateNotificationSettings(enabled) {
     try {
         if (enabled) {
-            await createDailyAlarm();
-            console.log('Automatic notifications enabled');
+            await createDailyAlarms();
+            console.log('Automatic notifications enabled for 14:00 and 15:30');
         } else {
-            await clearDailyAlarm();
+            await clearDailyAlarms();
             console.log('Automatic notifications disabled');
         }
     } catch (error) {
@@ -100,14 +111,14 @@ async function updateNotificationSettings(enabled) {
 async function checkDSPMismatches() {
     try {
         console.log('Starting DSP mismatch check...');
-        
+
         const tabs = await browser.tabs.query({
             url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
         });
 
         let dspTab;
         let createdNewTab = false;
-        
+
         if (tabs.length > 0) {
             dspTab = tabs[0];
             console.log('Found existing DSP tab, reloading...');
@@ -153,7 +164,7 @@ async function checkDSPMismatches() {
                 }
             }, 3000);
         }
-        
+
         console.log('DSP mismatch check completed');
     } catch (error) {
         console.error('Error in checkDSPMismatches:', error);
@@ -163,30 +174,30 @@ async function checkDSPMismatches() {
 
 async function sendMismatchNotifications(mismatches) {
     const results = [];
-    
+
     console.log(`Sending notifications for ${mismatches.length} mismatches...`);
-    
+
     for (const mismatch of mismatches) {
         try {
             const dspKey = mismatch.dspName.split(' ')[0];
             const webhookUrl = await getWebhookUrl(dspKey);
-            
+
             if (webhookUrl) {
-                const message = `:warning: Rostering Mismatch Alert for ${mismatch.dspName} :warning:
+                const message = `:warning: Rostering Mismatch Alert for ${mismatch.dspName}:
 :white_check_mark: Accepted: ${mismatch.confirmed}
 :heavy_exclamation_mark: Rostered: ${mismatch.rostered}
 Please check and adjust your roster accordingly.`;
-                
+
                 console.log(`Sending notification to ${dspKey}...`);
                 const result = await sendWebhookMessage(dspKey, message);
                 results.push({ dsp: dspKey, success: result.success, error: result.error });
-                
+
                 if (result.success) {
                     console.log(`✓ Notification sent successfully to ${dspKey}`);
                 } else {
                     console.error(`✗ Failed to send notification to ${dspKey}:`, result.error);
                 }
-                
+
                 // Small delay between webhook calls
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
@@ -198,11 +209,11 @@ Please check and adjust your roster accordingly.`;
             results.push({ dsp: mismatch.dspName, success: false, error: error.message });
         }
     }
-    
+
     const successCount = results.filter(r => r.success).length;
     const failCount = results.filter(r => !r.success).length;
     console.log(`Notification results: ${successCount} successful, ${failCount} failed`);
-    
+
     return results;
 }
 
@@ -214,10 +225,10 @@ async function sendWebhookMessage(dsp, message) {
 
     try {
         console.log(`Sending webhook message to ${dsp}:`, message.substring(0, 100) + '...');
-        
+
         const response = await fetch(webhookUrl, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ Content: message })
@@ -236,7 +247,7 @@ async function sendWebhookMessage(dsp, message) {
 
         console.log(`✓ Message sent successfully to ${dsp}`);
         return { success: true };
-        
+
     } catch (error) {
         console.error(`✗ Error sending webhook to ${dsp}:`, error);
         return { success: false, error: error.message };
