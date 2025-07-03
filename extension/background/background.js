@@ -183,7 +183,7 @@ async function sendMismatchNotifications(mismatches) {
             const webhookUrl = await getWebhookUrl(dspKey);
 
             if (webhookUrl) {
-                const message = `:warning: Rostering Mismatch Alert for ${mismatch.dspName}:
+                const message = `:warning: Rostering Mismatch Alert for ${mismatch.dspName} :warning: 
 :white_check_mark: Accepted: ${mismatch.confirmed}
 :heavy_exclamation_mark: Rostered: ${mismatch.rostered}
 Please check and adjust your roster accordingly.`;
