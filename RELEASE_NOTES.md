@@ -1,6 +1,6 @@
 # DSP Management Extension Release Notes
 
-## Version 1.5.4
+## Version 1.6.0
 
 ### 🚀 New Features
 - Enhanced dual daily checks at 2:00 PM and 3:30 PM

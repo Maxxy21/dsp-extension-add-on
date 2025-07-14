@@ -9,9 +9,31 @@ let webhookEntryCount = 0;
 // DOM elements Cache
 let elements = {};
 
+// Service type configuration
+const SERVICE_TYPES = {
+    cycle1: {
+        name: 'Cycle 1 (Standard Parcel)',
+        times: ['14:00', '15:30'],
+        elementId: 'enableCycle1',
+        timingId: 'cycle1Timing'
+    },
+    samedayB: {
+        name: 'Sameday B (Multi-Use)',
+        times: ['10:00'],
+        elementId: 'enableSamedayB',
+        timingId: 'samedayBTiming'
+    },
+    samedayC: {
+        name: 'Sameday C (Sameday Parcel)',
+        times: ['14:15'],
+        elementId: 'enableSamedayC',
+        timingId: 'samedayCTiming'
+    }
+};
+
 // Initialize DOM
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('🎉 Modern options page initializing...');
+    console.log('🎉 Enhanced options page initializing...');
 
     try {
         // Cache DOM elements
@@ -42,7 +64,14 @@ function cacheElements() {
         webhookEntries: document.getElementById('webhookEntries'),
         addWebhookBtn: document.getElementById('addWebhook'),
         enableNotifications: document.getElementById('enableNotifications'),
-        toast: document.getElementById('status')
+        toast: document.getElementById('status'),
+        // Service type elements
+        enableCycle1: document.getElementById('enableCycle1'),
+        enableSamedayB: document.getElementById('enableSamedayB'),
+        enableSamedayC: document.getElementById('enableSamedayC'),
+        cycle1Timing: document.getElementById('cycle1Timing'),
+        samedayBTiming: document.getElementById('samedayBTiming'),
+        samedayCTiming: document.getElementById('samedayCTiming')
     };
 
     // Validate required elements
@@ -84,6 +113,9 @@ async function loadSettings() {
             elements.enableNotifications.checked = notificationsEnabled;
         }
 
+        // Load service type settings
+        await loadServiceTypeSettings();
+
         // Load webhooks
         await loadWebhooks();
 
@@ -96,6 +128,46 @@ async function loadSettings() {
     } catch (error) {
         console.error('❌ Error loading settings:', error);
         throw new Error('Failed to load settings from storage');
+    }
+}
+
+async function loadServiceTypeSettings() {
+    try {
+        console.log('📡 Loading service type settings...');
+        
+        const result = await browser.storage.local.get(['serviceTypes']);
+        const serviceTypes = result.serviceTypes || {
+            cycle1: true,     // Default enabled
+            samedayB: false,
+            samedayC: false
+        };
+
+        console.log('✅ Loaded service type settings:', serviceTypes);
+
+        // Apply settings to UI
+        Object.entries(SERVICE_TYPES).forEach(([serviceType, config]) => {
+            const element = elements[config.elementId];
+            const timingElement = elements[config.timingId];
+            
+            if (element) {
+                element.checked = serviceTypes[serviceType] || false;
+            }
+            
+            // Show/hide timing info based on enabled state
+            if (timingElement) {
+                timingElement.style.display = serviceTypes[serviceType] ? 'block' : 'none';
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error loading service type settings:', error);
+        // Set defaults if error
+        Object.entries(SERVICE_TYPES).forEach(([serviceType, config]) => {
+            const element = elements[config.elementId];
+            if (element) {
+                element.checked = serviceType === 'cycle1'; // Only cycle1 enabled by default
+            }
+        });
     }
 }
 
@@ -412,18 +484,18 @@ function setupEventListeners() {
         console.error('❌ Add webhook button not found');
     }
 
-    // Notification settings toggle
+    // Master notification settings toggle
     if (elements.enableNotifications) {
         elements.enableNotifications.addEventListener('change', async (e) => {
             if (isLoading) return;
 
             const enabled = e.target.checked;
-            console.log('🔔 Notification setting changed:', enabled);
+            console.log('🔔 Master notification setting changed:', enabled);
 
             try {
                 await saveNotificationSettings(enabled);
 
-                // Send message to background script to update alarm
+                // Send message to background script to update alarms
                 try {
                     const response = await browser.runtime.sendMessage({
                         action: 'updateNotificationSettings',
@@ -437,10 +509,9 @@ function setupEventListeners() {
                     }
                 } catch (runtimeError) {
                     console.warn('⚠️ Could not communicate with background script:', runtimeError);
-                    // Don't show error to user as settings are still saved
                 }
 
-                showToast(`Notifications ${enabled ? 'enabled' : 'disabled'} successfully!`, 'success');
+                showToast(`Master notifications ${enabled ? 'enabled' : 'disabled'} successfully!`, 'success');
 
                 // Load alarm status if enabled
                 if (enabled) {
@@ -456,12 +527,48 @@ function setupEventListeners() {
             }
         });
 
-        console.log('✅ Notification toggle listener attached');
-    } else {
-        console.error('❌ Notification toggle not found');
+        console.log('✅ Master notification toggle listener attached');
     }
 
-    // Keyboard shortcuts
+    // Service type toggles
+    Object.entries(SERVICE_TYPES).forEach(([serviceType, config]) => {
+        const element = elements[config.elementId];
+        const timingElement = elements[config.timingId];
+
+        if (element) {
+            element.addEventListener('change', async (e) => {
+                if (isLoading) return;
+
+                const enabled = e.target.checked;
+                console.log(`🎯 Service type ${serviceType} changed:`, enabled);
+
+                // Show/hide timing info
+                if (timingElement) {
+                    timingElement.style.display = enabled ? 'block' : 'none';
+                }
+
+                try {
+                    await saveServiceTypeSettings();
+                    showToast(`${config.name} ${enabled ? 'enabled' : 'disabled'}`, 'success');
+
+                    // Load updated alarm status
+                    setTimeout(() => loadAlarmStatus(), 1000);
+                } catch (error) {
+                    console.error(`❌ Error updating ${serviceType} settings:`, error);
+                    showToast(`Failed to update ${config.name} settings`, 'error');
+                    // Revert toggle state
+                    e.target.checked = !enabled;
+                    if (timingElement) {
+                        timingElement.style.display = !enabled ? 'block' : 'none';
+                    }
+                }
+            });
+
+            console.log(`✅ Service type ${serviceType} listener attached`);
+        }
+    });
+
+    // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey || e.metaKey) {
             if (e.key === 's') {
@@ -492,6 +599,48 @@ async function saveNotificationSettings(enabled) {
     } catch (error) {
         console.error('❌ Error saving notification settings:', error);
         throw new Error('Failed to save notification settings');
+    }
+}
+
+async function saveServiceTypeSettings() {
+    if (!browser?.storage?.local) {
+        throw new Error('Browser storage API not available');
+    }
+
+    try {
+        console.log('💾 Saving service type settings...');
+        
+        const serviceTypes = {};
+        Object.entries(SERVICE_TYPES).forEach(([serviceType, config]) => {
+            const element = elements[config.elementId];
+            if (element) {
+                serviceTypes[serviceType] = element.checked;
+            }
+        });
+
+        console.log('💾 Service type settings to save:', serviceTypes);
+        await browser.storage.local.set({ serviceTypes });
+
+        // Send message to background script to update service type alarms
+        try {
+            const response = await browser.runtime.sendMessage({
+                action: 'updateServiceTypeSettings',
+                serviceTypes: serviceTypes
+            });
+
+            if (response?.success) {
+                console.log('✅ Background script service types updated successfully');
+            } else {
+                console.warn('⚠️ Background script service type update failed:', response);
+            }
+        } catch (runtimeError) {
+            console.warn('⚠️ Could not communicate with background script:', runtimeError);
+        }
+
+        console.log('✅ Service type settings saved successfully');
+    } catch (error) {
+        console.error('❌ Error saving service type settings:', error);
+        throw new Error('Failed to save service type settings');
     }
 }
 
@@ -610,7 +759,7 @@ async function loadAlarmStatus() {
 
 function displayAlarmStatus(alarms) {
     // Find the notification card content
-    const notificationCard = document.querySelector('.card:first-child .card-content');
+    const notificationCard = document.querySelector('.card:nth-child(2) .card-content');
     if (!notificationCard) return;
 
     // Remove existing status display

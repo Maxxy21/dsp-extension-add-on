@@ -30,6 +30,108 @@
         <!-- Main content -->
         <main class="main">
             <div class="settings-grid">
+                <!-- Service Type Settings Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-content">
+                            <h2>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                    <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                    <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                </svg>
+                                Service Type Configuration
+                            </h2>
+                            <p class="card-description">Select which service types your team monitors and configure automatic notifications</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="service-types-container">
+                            <!-- Cycle 1 (Standard Parcel) -->
+                            <div class="service-type-setting">
+                                <div class="toggle-setting">
+                                    <div class="toggle-info">
+                                        <label class="toggle-label" for="enableCycle1">Cycle 1 (Standard Parcel)</label>
+                                        <p class="toggle-description">Automatic checks at 14:00 and 15:30 daily</p>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="enableCycle1" checked>
+                                        <label for="enableCycle1" class="switch"></label>
+                                    </div>
+                                </div>
+                                <div class="service-timing" id="cycle1Timing">
+                                    <div class="timing-info">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                        <span>Notifications: 14:00, 15:30</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sameday B (Multi-Use) -->
+                            <div class="service-type-setting">
+                                <div class="toggle-setting">
+                                    <div class="toggle-info">
+                                        <label class="toggle-label" for="enableSamedayB">Sameday B (Multi-Use)</label>
+                                        <p class="toggle-description">Automatic check at 10:00 daily</p>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="enableSamedayB">
+                                        <label for="enableSamedayB" class="switch"></label>
+                                    </div>
+                                </div>
+                                <div class="service-timing" id="samedayBTiming" style="display: none;">
+                                    <div class="timing-info">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                        <span>Notifications: 10:00</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sameday C (Sameday Parcel) -->
+                            <div class="service-type-setting">
+                                <div class="toggle-setting">
+                                    <div class="toggle-info">
+                                        <label class="toggle-label" for="enableSamedayC">Sameday C (Sameday Parcel)</label>
+                                        <p class="toggle-description">Automatic check at 14:15 daily</p>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="enableSamedayC">
+                                        <label for="enableSamedayC" class="switch"></label>
+                                    </div>
+                                </div>
+                                <div class="service-timing" id="samedayCTiming" style="display: none;">
+                                    <div class="timing-info">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                            <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        </svg>
+                                        <span>Notifications: 14:15</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="service-types-info">
+                            <div class="info-card">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M12 16v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    <path d="M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                <div class="info-content">
+                                    <span>Follow-up notifications will be sent 15 minutes after initial alerts if mismatches remain unresolved</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Notification Settings Card -->
                 <div class="card">
                     <div class="card-header">
@@ -39,16 +141,16 @@
                                     <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                     <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                                Notification Settings
+                                Master Notification Control
                             </h2>
-                            <p class="card-description">Control when and how you send mismatch alerts</p>
+                            <p class="card-description">Enable or disable all automatic notifications</p>
                         </div>
                     </div>
                     <div class="card-content">
                         <div class="toggle-setting">
                             <div class="toggle-info">
-                                <label class="toggle-label" for="enableNotifications">Daily Automatic Checks</label>
-                                <p class="toggle-description">Automatically check for roster mismatches at 2:00 PM daily and send notifications to configured webhooks</p>
+                                <label class="toggle-label" for="enableNotifications">Enable Automatic Notifications</label>
+                                <p class="toggle-description">Master control for all automatic mismatch checks and notifications</p>
                             </div>
                             <div class="toggle-switch">
                                 <input type="checkbox" id="enableNotifications" checked>

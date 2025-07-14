@@ -1,13 +1,14 @@
 {
   "manifest_version": 2,
   "name": "DSP Roster Management Tool",
-  "version": "1.5.4",
-  "description": "DSP rostering management with automatic notifications and messaging. Cross-browser compatible.",
+  "version": "1.6.0",
+  "description": "DSP rostering management with automatic notifications and messaging. Cross-browser compatible with multi-service type support.",
   "permissions": [
     "alarms",
     "storage",
     "tabs",
     "activeTab",
+    "notifications",
     "https://logistics.amazon.co.uk/*",
     "https://hooks.chime.aws/*",
     "https://*/*"

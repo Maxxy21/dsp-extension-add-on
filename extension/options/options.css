@@ -108,7 +108,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('data:image/svg+xml,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%23ffffff" fill-opacity="0.05"><path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/></g></g></svg>') repeat;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" height="60" width="60"><g fill-rule="evenodd" fill="none"><g fill-opacity="0.05" fill="%23ffffff"><path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"></path></g></g></svg>') repeat;
     opacity: 0.3;
     pointer-events: none;
 }
@@ -562,6 +562,56 @@ input[type="checkbox"]:focus + .switch {
     pointer-events: none;
 }
 
+/* Service Type Specific Styles */
+.service-types-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.service-type-setting {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.service-type-setting:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.service-timing {
+    padding: var(--space-3) var(--space-6);
+    background: var(--primary-light);
+    border-top: 1px solid rgba(99, 102, 241, 0.2);
+    display: none;
+}
+
+.timing-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: 13px;
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.timing-info svg {
+    flex-shrink: 0;
+}
+
+.service-types-info {
+    margin-top: var(--space-4);
+}
+
+.service-types-info .info-card {
+    background: var(--warning-light);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: var(--warning);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .header {
@@ -609,6 +659,14 @@ input[type="checkbox"]:focus + .switch {
         left: var(--space-4);
         right: var(--space-4);
         max-width: none;
+    }
+    
+    .service-types-container {
+        gap: var(--space-3);
+    }
+    
+    .service-timing {
+        padding: var(--space-3) var(--space-4);
     }
 }
 
@@ -674,6 +732,15 @@ input[type="checkbox"]:focus + .switch {
         background: var(--gray-800);
         color: #fbbf24; /* Bright yellow for dark mode */
         border-color: var(--warning);
+    }
+    
+    .service-timing {
+        background: rgba(99, 102, 241, 0.1);
+    }
+    
+    .service-types-info .info-card {
+        background: rgba(245, 158, 11, 0.1);
+        color: #fbbf24;
     }
 }
 
