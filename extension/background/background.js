@@ -444,7 +444,7 @@ async function sendFollowUpWebhookNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
             
             if (webhookUrl) {
-                const message = `:rotating_light: URGENT - ${serviceConfig.displayName} Mismatch Still Unresolved :rotating_light:
+                const message = `/md :rotating_light: URGENT - ${serviceConfig.displayName} Mismatch Still Unresolved :rotating_light:
 
 :warning: **15 minutes have passed** since the initial alert for ${mismatch.dspName}
 
