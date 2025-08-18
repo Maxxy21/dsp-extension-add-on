@@ -241,7 +241,7 @@ async function checkDSPMismatches(serviceType, alarmName) {
         console.log(`🔍 Starting DSP mismatch check for ${serviceType}...`);
 
         const tabs = await browser.tabs.query({
-            url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
+            url: ["https://logistics.amazon.co.uk/internal/scheduling/dsps*", "file://*"]
         });
 
         let dspTab;
@@ -252,6 +252,7 @@ async function checkDSPMismatches(serviceType, alarmName) {
             console.log('📄 Found existing DSP tab, reloading...');
             await browser.tabs.reload(dspTab.id);
         } else {
+            // Only create new tab for production site, not for local testing
             console.log('🆕 Creating new DSP tab...');
             dspTab = await browser.tabs.create({
                 url: "https://logistics.amazon.co.uk/internal/scheduling/dsps",
@@ -381,7 +382,7 @@ async function recheckMismatches(serviceType) {
         console.log(`🔄 Rechecking mismatches for ${serviceType} - refreshing page first...`);
         
         const tabs = await browser.tabs.query({
-            url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
+            url: ["https://logistics.amazon.co.uk/internal/scheduling/dsps*", "file://*"]
         });
         
         if (tabs.length === 0) {
@@ -441,6 +442,7 @@ async function sendBrowserNotification(mismatches, serviceType) {
 browser.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
     if (buttonIndex === 0) { // Open DSP Page
         try {
+            // Always open production site from notifications
             await browser.tabs.create({
                 url: "https://logistics.amazon.co.uk/internal/scheduling/dsps",
                 active: true
