@@ -448,14 +448,16 @@ async function sendFollowUpWebhookNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
             
             if (webhookUrl) {
-                const message = `/md :rotating_light: URGENT - ${serviceConfig.displayName} Mismatch Still Unresolved :rotating_light:
+                const message = `/md ## 🚨 URGENT - ${serviceConfig.displayName} Mismatch Still Unresolved
 
-:warning: **15 minutes have passed** since the initial alert for ${mismatch.dspName}
+⚠️ **15 minutes have passed** since the initial alert for **${mismatch.dspName}**
 
-:white_check_mark: Accepted: ${mismatch.confirmed}
-:heavy_exclamation_mark: Rostered: ${mismatch.rostered}
+| Status | Count |
+|--------|-------|
+| ✅ **Accepted** | ${mismatch.confirmed} |
+| ❗ **Rostered** | ${mismatch.rostered} |
 
-**IMMEDIATE ACTION REQUIRED** - Please check and adjust your roster now.`;
+> **🔴 IMMEDIATE ACTION REQUIRED** - Please check and adjust your roster now.`;
 
                 await sendWebhookMessage(dspKey, message);
                 await new Promise(resolve => setTimeout(resolve, 1000));
@@ -480,10 +482,16 @@ async function sendMismatchNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
 
             if (webhookUrl) {
-                const message = `:warning: ${serviceConfig.displayName} Rostering Mismatch Alert for ${mismatch.dspName} :warning: 
-:white_check_mark: Accepted: ${mismatch.confirmed}
-:heavy_exclamation_mark: Rostered: ${mismatch.rostered}
-Please check and adjust your roster accordingly.`;
+                const message = `/md ## ⚠️ ${serviceConfig.displayName} Rostering Mismatch Alert
+
+**DSP:** ${mismatch.dspName}
+
+| Status | Count |
+|--------|-------|
+| ✅ **Accepted** | ${mismatch.confirmed} |
+| ❗ **Rostered** | ${mismatch.rostered} |
+
+> **Action Required:** Please check and adjust your roster accordingly.`;
 
                 console.log(`📤 Sending notification to ${dspKey}...`);
                 const result = await sendWebhookMessage(dspKey, message);
