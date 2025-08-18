@@ -790,6 +790,7 @@ input[type="checkbox"]:focus + .switch {
     height: 100%;
     border: none;
     background: var(--background);
+    color: var(--text-primary);
     padding: 20px;
     font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
     font-size: 13px;
@@ -797,6 +798,10 @@ input[type="checkbox"]:focus + .switch {
     resize: none;
     outline: none;
     border-radius: var(--radius-lg);
+}
+
+#batchTextInput::placeholder {
+    color: var(--text-muted);
 }
 
 .batch-drop-zone.text-mode {

@@ -442,16 +442,24 @@ function setupWebhookEntryListeners(entryDiv) {
     inputs.forEach(input => {
         if (!input) return;
 
-        // Auto-save on blur and input with debouncing
-        input.addEventListener('blur', debounce(() => {
-            console.log('💾 Input blur event, saving webhooks');
+        // Auto-save on blur (immediate) and input with debouncing
+        input.addEventListener('blur', () => {
+            console.log('💾 Input blur event, saving webhooks immediately');
             saveWebhooks();
-        }, 500));
+        });
 
         input.addEventListener('input', debounce(() => {
-            console.log('💾 Input change event, saving webhooks');
+            console.log('💾 Input change event, saving webhooks (debounced)');
             saveWebhooks();
         }, 2000));
+
+        // Also save on Enter key
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                console.log('💾 Enter key pressed, saving webhooks immediately');
+                saveWebhooks();
+            }
+        });
 
         // Add validation feedback
         input.addEventListener('invalid', (e) => {
@@ -593,6 +601,20 @@ function setupEventListeners() {
         // Escape to close toast
         if (e.key === 'Escape') {
             hideToast();
+        }
+    });
+
+    // Save webhooks before page unload to prevent data loss
+    window.addEventListener('beforeunload', () => {
+        console.log('💾 Page unloading, saving webhooks...');
+        saveWebhooks();
+    });
+
+    // Also save when page becomes hidden (for mobile/tab switching)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            console.log('💾 Page hidden, saving webhooks...');
+            saveWebhooks();
         }
     });
 
@@ -744,7 +766,12 @@ async function saveWebhooks() {
         }
 
         await browser.storage.local.set({ webhooks });
-        console.log('✅ Webhooks saved successfully:', Object.keys(webhooks));
+        console.log('✅ Webhooks saved successfully to storage:', Object.keys(webhooks));
+        console.log('📊 Full webhook data:', webhooks);
+
+        // Verify the save worked by reading it back
+        const verification = await browser.storage.local.get('webhooks');
+        console.log('🔍 Verification - data read back from storage:', verification.webhooks);
 
         showToast('Webhook configuration saved successfully!', 'success');
 
@@ -1144,12 +1171,15 @@ async function processBatchInput() {
             if (!isDuplicate) {
                 addWebhookEntry(dspCode, webhookUrl);
                 addedCount++;
+                console.log(`✅ Added webhook entry: ${dspCode} -> ${webhookUrl.substring(0, 50)}...`);
             } else {
                 console.warn(`⚠️ Skipping duplicate DSP code: ${dspCode}`);
             }
         }
 
-        // Save after adding all webhooks
+        // Wait a moment for DOM updates, then save
+        console.log(`💾 Preparing to save ${addedCount} new webhook entries...`);
+        await new Promise(resolve => setTimeout(resolve, 100));
         await saveWebhooks();
 
         showToast(`Successfully imported ${addedCount} webhook${addedCount !== 1 ? 's' : ''}!`, 'success');
