@@ -606,6 +606,25 @@ input[type="checkbox"]:focus + .switch {
     margin-top: var(--space-4);
 }
 
+/* Inference Status Styles */
+.inference-status {
+    margin-top: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.inference-status .inference-card {
+    background: var(--success-light);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
+.inference-status .info-content small {
+    display: block;
+    margin-top: var(--space-1);
+    font-size: 12px;
+    opacity: 0.8;
+}
+
 .service-types-info .info-card {
     background: var(--warning-light);
     border-color: rgba(245, 158, 11, 0.2);

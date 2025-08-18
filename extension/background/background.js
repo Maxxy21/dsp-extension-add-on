@@ -178,6 +178,10 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
             case "getAlarmStatus":
                 return await getAlarmStatus();
                 
+            case "serviceTypesInferred":
+                await handleServiceTypesInferred(request.detectedTypes, request.updatedSettings);
+                return { success: true };
+                
             default:
                 return { success: false, error: 'Unknown action' };
         }
@@ -543,6 +547,30 @@ async function sendWebhookMessage(dsp, message) {
     } catch (error) {
         console.error(`❌ Error sending webhook to ${dsp}:`, error);
         return { success: false, error: error.message };
+    }
+}
+
+async function handleServiceTypesInferred(detectedTypes, updatedSettings) {
+    try {
+        console.log('🔍 Service types inferred from page:', detectedTypes);
+        console.log('📋 Updated settings:', updatedSettings);
+        
+        // Update alarms if notifications are enabled (similar to amzl-scripts alarm management)
+        const notificationsEnabled = await getNotificationSettings();
+        if (notificationsEnabled) {
+            console.log('🔔 Updating alarms based on inferred service types...');
+            await createServiceTypeAlarms();
+        }
+        
+        // Optionally send notification about auto-detection
+        const enabledTypes = Object.keys(updatedSettings).filter(type => updatedSettings[type]);
+        if (enabledTypes.length > 0) {
+            console.log(`✅ Auto-detected and enabled ${enabledTypes.length} service types: ${enabledTypes.join(', ')}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error handling inferred service types:', error);
+        throw error;
     }
 }
 
