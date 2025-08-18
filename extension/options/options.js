@@ -135,7 +135,7 @@ async function loadServiceTypeSettings() {
     try {
         console.log('📡 Loading service type settings...');
         
-        const result = await browser.storage.local.get(['serviceTypes']);
+        const result = await browser.storage.local.get(['serviceTypes', 'lastInferredTypes', 'inferenceTimestamp']);
         const serviceTypes = result.serviceTypes || {
             cycle1: true,     // Default enabled
             samedayB: false,
@@ -158,6 +158,9 @@ async function loadServiceTypeSettings() {
                 timingElement.style.display = serviceTypes[serviceType] ? 'block' : 'none';
             }
         });
+
+        // Display service type inference status (similar to amzl-scripts data display)
+        await displayInferenceStatus(result.lastInferredTypes, result.inferenceTimestamp);
 
     } catch (error) {
         console.error('❌ Error loading service type settings:', error);
@@ -878,5 +881,66 @@ function showToast(message, type = 'success') {
 function hideToast() {
     if (elements.toast) {
         elements.toast.classList.remove('show');
+    }
+}
+
+// Service Type Inference Display (similar to amzl-scripts data presentation)
+async function displayInferenceStatus(lastInferredTypes, inferenceTimestamp) {
+    try {
+        const inferenceStatusElement = document.getElementById('inferenceStatus');
+        const detectedTypesElement = document.getElementById('detectedTypes');
+        const inferenceTimeElement = document.getElementById('inferenceTime');
+        
+        if (!inferenceStatusElement || !detectedTypesElement || !inferenceTimeElement) {
+            console.warn('📊 Inference status elements not found in DOM');
+            return;
+        }
+
+        if (lastInferredTypes && lastInferredTypes.length > 0) {
+            // Show the inference status section
+            inferenceStatusElement.style.display = 'block';
+            
+            // Format detected types with friendly names (similar to amzl-scripts service type mapping)
+            const friendlyNames = lastInferredTypes.map(type => {
+                const mapping = {
+                    'cycle1': 'Cycle 1 (Standard)',
+                    'samedayB': 'Sameday B (Multi-Use)', 
+                    'samedayC': 'Sameday C (Sameday)'
+                };
+                return mapping[type] || type;
+            }).join(', ');
+            
+            detectedTypesElement.textContent = friendlyNames;
+            
+            // Format timestamp
+            if (inferenceTimestamp) {
+                const inferenceDate = new Date(inferenceTimestamp);
+                const now = new Date();
+                const timeDiff = now - inferenceDate;
+                
+                let timeText = '';
+                if (timeDiff < 60000) { // Less than 1 minute
+                    timeText = 'Just now';
+                } else if (timeDiff < 3600000) { // Less than 1 hour
+                    const minutes = Math.floor(timeDiff / 60000);
+                    timeText = `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+                } else if (timeDiff < 86400000) { // Less than 1 day
+                    const hours = Math.floor(timeDiff / 3600000);
+                    timeText = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                } else {
+                    timeText = inferenceDate.toLocaleDateString() + ' at ' + inferenceDate.toLocaleTimeString();
+                }
+                
+                inferenceTimeElement.textContent = `Last detected: ${timeText}`;
+            }
+            
+            console.log('📊 Displayed inference status:', friendlyNames);
+        } else {
+            // Hide inference status if no data
+            inferenceStatusElement.style.display = 'none';
+            console.log('📊 No inference data to display');
+        }
+    } catch (error) {
+        console.error('❌ Error displaying inference status:', error);
     }
 }
