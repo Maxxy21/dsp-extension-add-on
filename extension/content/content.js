@@ -390,104 +390,43 @@ class DSPDataParser {
     }
 }
 
-// Enhanced Mismatch Highlighter
+// Simplified Mismatch Highlighter (like Tampermonkey script)
 class MismatchHighlighter {
-    constructor() {
-        this.currentServiceType = null;
-    }
-
-    highlightMismatches(serviceType = 'cycle1') {
+    highlightMismatches() {
         try {
-            this.currentServiceType = serviceType;
-            const rows = document.querySelectorAll(CONFIG.SELECTORS.TABLE_ROWS);
-            console.log(`Highlighter: Processing ${rows.length} rows for highlighting (${serviceType})`);
-            
+            console.log('Highlighter: Starting to highlight mismatched cells...');
+            const rows = document.querySelectorAll('tr');
             let highlightCount = 0;
-            let inTargetSection = false;
-            
+
             rows.forEach(row => {
-                // Check if we're entering a service type section
-                const serviceTypeCell = row.querySelector(CONFIG.SELECTORS.SERVICE_TYPE_EXPANDABLE);
-                if (serviceTypeCell) {
-                    const serviceTypeName = serviceTypeCell.textContent.trim();
-                    const serviceTypeMapping = {
-                        [CONFIG.SERVICE_TYPES.STANDARD_PARCEL]: 'cycle1',
-                        [CONFIG.SERVICE_TYPES.MULTI_USE]: 'samedayB',
-                        [CONFIG.SERVICE_TYPES.SAMEDAY_PARCEL]: 'samedayC'
-                    };
-                    
-                    const currentType = serviceTypeMapping[serviceTypeName];
-                    inTargetSection = currentType === serviceType;
-                    return;
-                }
-                
-                // Check if we're leaving a service type section
-                if (row.classList && row.classList.contains('serviceTypeRow')) {
-                    inTargetSection = false;
-                    return;
-                }
-                
-                // Only highlight if we're in the target service type section
-                if (inTargetSection && this.processRow(row)) {
-                    highlightCount++;
+                // Get the confirmed (accepted) and rostered cells
+                const confirmedCell = row.querySelector('td span[data-bind*="text: confirmed"]');
+                const rosteredCell = row.querySelector('td[data-bind*="text: totalRostered"]');
+
+                if (confirmedCell && rosteredCell) {
+                    const confirmedValue = parseInt(confirmedCell.textContent, 10);
+                    const rosteredValue = parseInt(rosteredCell.textContent, 10);
+
+                    if (!isNaN(confirmedValue) && !isNaN(rosteredValue) && confirmedValue !== rosteredValue) {
+                        // Highlight both cells
+                        confirmedCell.parentElement.style.backgroundColor = CONFIG.STYLES.HIGHLIGHT_COLOR;
+                        rosteredCell.style.backgroundColor = CONFIG.STYLES.HIGHLIGHT_COLOR;
+
+                        // Add a tooltip showing the mismatch
+                        const tooltip = `Mismatch - Confirmed: ${confirmedValue}, Rostered: ${rosteredValue}`;
+                        confirmedCell.parentElement.title = tooltip;
+                        rosteredCell.title = tooltip;
+                        
+                        highlightCount++;
+                        console.log(`Highlighter: Highlighted mismatch - Confirmed: ${confirmedValue}, Rostered: ${rosteredValue}`);
+                    }
                 }
             });
             
-            console.log(`Highlighter: Highlighted ${highlightCount} mismatched rows for ${serviceType}`);
+            console.log(`Highlighter: Highlighted ${highlightCount} mismatched rows`);
         } catch (error) {
             console.error('Highlighter: Error highlighting mismatches:', error);
         }
-    }
-
-    processRow(row) {
-        try {
-            const confirmedCell = row.querySelector(CONFIG.SELECTORS.CONFIRMED_CELL);
-            const rosteredCell = row.querySelector(CONFIG.SELECTORS.ROSTERED_CELL);
-
-            if (!confirmedCell || !rosteredCell) return false;
-
-            const confirmedValue = Utils.parseInteger(confirmedCell.textContent);
-            const rosteredValue = Utils.parseInteger(rosteredCell.textContent);
-            
-            if (confirmedValue !== rosteredValue && (confirmedValue > 0 || rosteredValue > 0)) {
-                this.highlightCells(confirmedCell, rosteredCell, confirmedValue, rosteredValue);
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.warn('Highlighter: Error processing row:', error);
-            return false;
-        }
-    }
-
-    highlightCells(confirmedCell, rosteredCell, confirmedValue, rosteredValue) {
-        try {
-            const serviceTypeText = this.getServiceTypeDisplayName(this.currentServiceType);
-            const tooltip = `${serviceTypeText} Mismatch - Confirmed: ${confirmedValue}, Rostered: ${rosteredValue}`;
-
-            // Highlight confirmed cell's parent
-            if (confirmedCell.parentElement) {
-                confirmedCell.parentElement.style.backgroundColor = CONFIG.STYLES.HIGHLIGHT_COLOR;
-                confirmedCell.parentElement.title = tooltip;
-            }
-            
-            // Highlight rostered cell
-            rosteredCell.style.backgroundColor = CONFIG.STYLES.HIGHLIGHT_COLOR;
-            rosteredCell.title = tooltip;
-            
-            console.log(`Highlighter: Applied highlighting for ${this.currentServiceType} mismatch ${confirmedValue} vs ${rosteredValue}`);
-        } catch (error) {
-            console.warn('Highlighter: Error applying highlight styles:', error);
-        }
-    }
-
-    getServiceTypeDisplayName(serviceType) {
-        const mapping = {
-            'cycle1': 'Cycle 1',
-            'samedayB': 'Sameday B',
-            'samedayC': 'Sameday C'
-        };
-        return mapping[serviceType] || serviceType;
     }
 }
 
@@ -538,33 +477,24 @@ class DSPManagementTool {
 
     async setupHighlighting() {
         try {
-            // Get enabled service types from storage
-            const { serviceTypes = { cycle1: true, samedayB: false, samedayC: false } } = 
-                await browser.storage.local.get('serviceTypes');
+            console.log('DSP Tool: Setting up highlighting for all service types');
             
-            // Highlight all enabled service types with progressive delays
+            // Run highlighting with progressive delays to catch dynamic content
             const delays = [2000, 5000, 8000];
             
             delays.forEach(delay => {
                 setTimeout(() => {
-                    console.log(`DSP Tool: Running highlighting after ${delay}ms`);
-                    
-                    // Highlight each enabled service type
-                    Object.entries(serviceTypes).forEach(([serviceType, enabled]) => {
-                        if (enabled) {
-                            console.log(`DSP Tool: Highlighting ${serviceType}`);
-                            this.highlighter.highlightMismatches(serviceType);
-                        }
-                    });
+                    console.log(`DSP Tool: Running highlighting after ${delay}ms for all service types`);
+                    this.highlighter.highlightMismatches();
                 }, delay);
             });
         } catch (error) {
             console.error('DSP Tool: Error setting up highlighting:', error);
-            // Fallback to highlighting cycle1 only
+            // Fallback to basic highlighting
             const delays = [2000, 5000, 8000];
             delays.forEach(delay => {
                 setTimeout(() => {
-                    this.highlighter.highlightMismatches('cycle1');
+                    this.highlighter.highlightMismatches();
                 }, delay);
             });
         }
@@ -572,15 +502,15 @@ class DSPManagementTool {
 
     setupTableObserver() {
         try {
-            // Try to find table immediately
-            let table = document.querySelector(CONFIG.SELECTORS.TABLE);
+            // Try to find table immediately (like Tampermonkey script)
+            let table = document.querySelector('table');
             
             if (!table) {
                 console.log('DSP Tool: Table not found immediately, setting up observer to wait for it');
                 
                 // Set up observer to wait for table
                 const observer = new MutationObserver((mutations) => {
-                    table = document.querySelector(CONFIG.SELECTORS.TABLE);
+                    table = document.querySelector('table');
                     if (table) {
                         console.log('DSP Tool: Table found, setting up table observer');
                         observer.disconnect();
@@ -618,19 +548,11 @@ class DSPManagementTool {
                         console.log('DSP Tool: Table changed, updating highlights');
                         
                         try {
-                            // Get enabled service types and highlight all of them
-                            const { serviceTypes = { cycle1: true, samedayB: false, samedayC: false } } = 
-                                await browser.storage.local.get('serviceTypes');
-                            
-                            Object.entries(serviceTypes).forEach(([serviceType, enabled]) => {
-                                if (enabled) {
-                                    this.highlighter.highlightMismatches(serviceType);
-                                }
-                            });
+                            console.log('DSP Tool: Updating highlights for all service types');
+                            this.highlighter.highlightMismatches();
                         } catch (error) {
                             console.error('DSP Tool: Error updating highlights:', error);
-                            // Fallback to cycle1
-                            this.highlighter.highlightMismatches('cycle1');
+                            this.highlighter.highlightMismatches();
                         }
                     }, 1000);
                 }

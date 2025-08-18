@@ -199,6 +199,52 @@
                             </svg>
                             Add New DSP Webhook
                         </button>
+                        
+                        <!-- Batch Input Section -->
+                        <div class="batch-input-section">
+                            <div class="batch-header">
+                                <h3>Batch Import</h3>
+                                <p>Drag and drop or paste multiple DSP codes and webhook URLs at once</p>
+                            </div>
+                            
+                            <div id="batchDropZone" class="batch-drop-zone">
+                                <div class="drop-zone-content">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        <polyline points="10,9 9,9 8,9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <h4>Drop files here or click to paste</h4>
+                                    <p>Supports CSV, TXT, or plain text format</p>
+                                    <div class="format-examples">
+                                        <small><strong>Expected format:</strong></small>
+                                        <small>DHH1,https://hooks.chime.aws/...</small>
+                                        <small>DHH2,https://hooks.chime.aws/...</small>
+                                    </div>
+                                </div>
+                                <textarea id="batchTextInput" placeholder="Paste your DSP codes and webhook URLs here...&#10;&#10;Format examples:&#10;DHH1,https://hooks.chime.aws/incomingwebhooks/...&#10;DHH2,https://hooks.chime.aws/incomingwebhooks/...&#10;&#10;Or tab-separated:&#10;DHH1	https://hooks.chime.aws/...&#10;DHH2	https://hooks.chime.aws/..." style="display: none;"></textarea>
+                            </div>
+                            
+                            <div class="batch-actions">
+                                <button id="showTextInput" class="btn btn-secondary" type="button">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <polyline points="4,7 4,4 20,4 20,7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <line x1="9" y1="20" x2="15" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        <line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    Paste Text
+                                </button>
+                                <button id="processBatch" class="btn btn-primary" type="button" style="display: none;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <polyline points="20,6 9,17 4,12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    Import Webhooks
+                                </button>
+                                <button id="cancelBatch" class="btn btn-secondary" type="button" style="display: none;">Cancel</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

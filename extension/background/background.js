@@ -378,6 +378,8 @@ async function handleFollowUpNotification(alarmName) {
 
 async function recheckMismatches(serviceType) {
     try {
+        console.log(`🔄 Rechecking mismatches for ${serviceType} - refreshing page first...`);
+        
         const tabs = await browser.tabs.query({
             url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
         });
@@ -387,11 +389,24 @@ async function recheckMismatches(serviceType) {
             return [];
         }
         
-        const response = await browser.tabs.sendMessage(tabs[0].id, { 
+        const dspTab = tabs[0];
+        
+        // Refresh the page first to get latest roster data
+        console.log('🔄 Refreshing DSP tab to get latest roster data...');
+        await browser.tabs.reload(dspTab.id);
+        
+        // Wait for page to reload and content script to initialize
+        console.log('⏳ Waiting for page to reload and initialize...');
+        await new Promise(resolve => setTimeout(resolve, 6000));
+        
+        // Now check for mismatches with fresh data
+        console.log('📡 Checking mismatches with fresh data...');
+        const response = await browser.tabs.sendMessage(dspTab.id, { 
             action: "checkMismatches",
             serviceType: serviceType
         });
         
+        console.log(`📊 Recheck completed for ${serviceType}: ${response?.mismatches?.length || 0} mismatches found`);
         return response?.mismatches || [];
     } catch (error) {
         console.error('❌ Error rechecking mismatches:', error);
@@ -448,7 +463,7 @@ async function sendFollowUpWebhookNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
             
             if (webhookUrl) {
-                const message = `/md ## 🚨 URGENT - ${serviceConfig.displayName} Mismatch Still Unresolved
+                const message = `/md ### 🚨 URGENT - ${serviceConfig.displayName} Mismatch Still Unresolved
 
 ⚠️ **15 minutes have passed** since the initial alert for **${mismatch.dspName}**
 
@@ -482,7 +497,7 @@ async function sendMismatchNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
 
             if (webhookUrl) {
-                const message = `/md ## ⚠️ ${serviceConfig.displayName} Rostering Mismatch Alert
+                const message = `/md ### ⚠️ ${serviceConfig.displayName} Rostering Mismatch Alert
 
 **DSP:** ${mismatch.dspName}
 
