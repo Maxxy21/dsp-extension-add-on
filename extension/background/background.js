@@ -522,7 +522,7 @@ async function sendMismatchNotifications(mismatches, serviceType) {
 
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } else {
-                console.log(`⚠️ No webhook configured for DSP: ${dspKey}`);
+                console.log(`⚠️ No webhook configured for DSP : ${dspKey}`);
                 results.push({ dsp: dspKey, success: false, error: 'No webhook configured' });
             }
         } catch (error) {
