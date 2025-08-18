@@ -241,7 +241,7 @@ async function checkDSPMismatches(serviceType, alarmName) {
         console.log(`🔍 Starting DSP mismatch check for ${serviceType}...`);
 
         const tabs = await browser.tabs.query({
-            url: ["https://logistics.amazon.co.uk/internal/scheduling/dsps*", "file://*"]
+            url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
         });
 
         let dspTab;
@@ -382,7 +382,7 @@ async function recheckMismatches(serviceType) {
         console.log(`🔄 Rechecking mismatches for ${serviceType} - refreshing page first...`);
         
         const tabs = await browser.tabs.query({
-            url: ["https://logistics.amazon.co.uk/internal/scheduling/dsps*", "file://*"]
+            url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
         });
         
         if (tabs.length === 0) {
