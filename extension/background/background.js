@@ -465,7 +465,7 @@ async function sendFollowUpWebhookNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
             
             if (webhookUrl) {
-                let message = `/md 🚨 **URGENT - ${serviceConfig.displayName} Rostering Still Unresolved**
+                let message = `/md ####🚨 **URGENT - ${serviceConfig.displayName} Rostering Still Unresolved**
 
 ⚠️ **15 minutes have passed** since the initial alert for **${mismatch.dspName}**
 
@@ -504,7 +504,7 @@ async function sendMismatchNotifications(mismatches, serviceType) {
             const webhookUrl = await getWebhookUrl(dspKey);
 
             if (webhookUrl) {
-                let message = `/md  ⚠️ **${serviceConfig.displayName} Rostering Mismatch Alert
+                let message = `/md #### ⚠️ ${serviceConfig.displayName} Rostering Mismatch Alert
 
 **DSP:** ${mismatch.dspName}
 
