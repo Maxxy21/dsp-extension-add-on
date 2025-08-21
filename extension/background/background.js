@@ -134,7 +134,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
         
         if (alarm.name.includes('cycle1')) {
             serviceType = 'cycle1';
-            alarmTime = alarm.name.includes('_14') ? '14:00' : '15:30';
+            alarmTime = alarm.name.includes('_14') ? '14:00' : '15:00';
         } else if (alarm.name.includes('samedayB')) {
             serviceType = 'samedayB';
             alarmTime = '10:00';
@@ -619,7 +619,7 @@ async function getAlarmStatus() {
             let description = 'Unknown Service';
             
             if (alarm.name.includes('cycle1')) {
-                const time = alarm.name.includes('_14') ? '14:00' : '15:30';
+                const time = alarm.name.includes('_14') ? '14:00' : '15:00';
                 description = `Cycle 1 Check (${time})`;
             } else if (alarm.name.includes('samedayB')) {
                 description = 'Sameday B Check (10:00)';

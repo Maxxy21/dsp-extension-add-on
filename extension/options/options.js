@@ -13,7 +13,7 @@ let elements = {};
 const SERVICE_TYPES = {
     cycle1: {
         name: 'Cycle 1 (Standard Parcel)',
-        times: ['14:00', '15:30'],
+        times: ['14:00', '15:00'],
         elementId: 'enableCycle1',
         timingId: 'cycle1Timing'
     },
