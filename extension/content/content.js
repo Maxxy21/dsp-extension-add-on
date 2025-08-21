@@ -16,6 +16,7 @@ const CONFIG = {
     },
     SERVICE_TYPES: {
         STANDARD_PARCEL: 'Standard Parcel',
+        STANDARD_PARCEL_MEDIUM_VAN: 'Standard Parcel Medium Van',
         MULTI_USE: 'Multi-Use',
         SAMEDAY_PARCEL: 'Sameday Parcel'
     }
@@ -149,7 +150,7 @@ class ServiceTypeInferrer {
                     const text = serviceTypeCell.textContent.trim();
                     
                     // Infer service type from text content
-                    if (text.match(/(Standard|Parcel|Cycle.*1)/i)) {
+                    if (text.match(/(Standard.*Parcel|Cycle.*1)/i)) {
                         this.currentPageServiceTypes.add('cycle1');
                     } else if (text.match(/(Multi.?Use|Sameday.*B)/i)) {
                         this.currentPageServiceTypes.add('samedayB');
@@ -314,6 +315,7 @@ class DSPDataParser {
         // Map service type names to our internal identifiers
         const serviceTypeMapping = {
             [CONFIG.SERVICE_TYPES.STANDARD_PARCEL]: 'cycle1',
+            [CONFIG.SERVICE_TYPES.STANDARD_PARCEL_MEDIUM_VAN]: 'cycle1',
             [CONFIG.SERVICE_TYPES.MULTI_USE]: 'samedayB',
             [CONFIG.SERVICE_TYPES.SAMEDAY_PARCEL]: 'samedayC'
         };
