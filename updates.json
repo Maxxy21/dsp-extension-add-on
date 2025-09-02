@@ -281,6 +281,16 @@
               "strict_min_version": "75.0"
             }
           }
+        },
+        {
+          "version": "1.7.6",
+          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.7.6/dsp-extension-v1.7.6.xpi",
+          "update_hash": "sha256:47f60e8ce3eae809e11d63175f129b2a02f26223e827ef1ebe8311b710749bd5",
+          "applications": {
+            "gecko": {
+              "strict_min_version": "75.0"
+            }
+          }
         }
       ]
     }
