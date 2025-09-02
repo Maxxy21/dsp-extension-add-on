@@ -144,7 +144,7 @@ async function loadSettings() {
         console.log('✅ Settings loaded successfully');
     } catch (error) {
         console.error('❌ Error loading settings:', error);
-        throw new Error('Failed to load settings from storage');
+        showToast('Failed to load some settings, using defaults', 'error');
     }
 }
 
@@ -1399,4 +1399,82 @@ function parseBatchText(text) {
 
     console.log(`📊 Parsed ${webhooks.length} valid webhook entries`);
     return webhooks;
+}
+
+
+function computeDateParam(serviceType) {
+    const now = new Date();
+    const date = new Date(now);
+    if (serviceType === 'cycle1') date.setDate(date.getDate() + 1);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function buildSchedulingUrl(settings, isCycle1, dateStr) {
+    const baseConfigured = settings.schedulingBaseUrl || '';
+    const serviceAreaId = settings.serviceAreaId || '';
+    const defaultBase = 'https://logistics.amazon.co.uk/internal/scheduling/dsps';
+    let baseUrl = baseConfigured || (serviceAreaId ? `${defaultBase}?serviceAreaId=${encodeURIComponent(serviceAreaId)}` : defaultBase);
+    try {
+        const url = new URL(baseUrl, defaultBase);
+        url.searchParams.set('date', dateStr);
+        return url.toString();
+    } catch (e) {
+        return baseUrl + (baseUrl.includes('?') ? `&date=${dateStr}` : `?date=${dateStr}`);
+    }
+}
+
+function buildRoutePlanningUrl(settings, dateStr) {
+    const base = settings.routePlanningBaseUrl || '';
+    if (!base) return 'https://eu.route.planning.last-mile.a2z.com/route-planning';
+    try {
+        const url = new URL(base);
+        if (/\/route-planning\/[A-Z0-9]+\/.+/.test(url.pathname)) {
+            return `${url.origin}${url.pathname}/${dateStr}`;
+        }
+        return base;
+    } catch (e) {
+        return base.endsWith('/') ? base + dateStr : `${base}/${dateStr}`;
+    }
+}
+
+async function renderUrlPreviews() {
+    try {
+        const { settings = {} } = await browser.storage.local.get('settings');
+        const today = computeDateParam('other');
+        const tomorrow = computeDateParam('cycle1');
+        const schedCycle1 = buildSchedulingUrl(settings, true, tomorrow);
+        const schedToday = buildSchedulingUrl(settings, false, today);
+        const routeToday = buildRoutePlanningUrl(settings, today);
+        if (!elements.urlPreviews) return;
+        while (elements.urlPreviews.firstChild) elements.urlPreviews.removeChild(elements.urlPreviews.firstChild);
+        const lines = [
+            { label: 'Scheduling (Cycle 1 - tomorrow)', url: schedCycle1 },
+            { label: 'Scheduling (Today)', url: schedToday },
+            { label: 'Route Planning (Today)', url: routeToday }
+        ];
+        lines.forEach(line => {
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.flexDirection = 'column';
+            row.style.marginBottom = '8px';
+            const label = document.createElement('strong');
+            label.textContent = line.label;
+            label.style.marginBottom = '4px';
+            const link = document.createElement('a');
+            link.href = line.url;
+            link.textContent = line.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.style.fontFamily = 'var(--font-mono, monospace)';
+            link.style.wordBreak = 'break-all';
+            row.appendChild(label);
+            row.appendChild(link);
+            elements.urlPreviews.appendChild(row);
+        });
+    } catch (e) {
+        console.warn('Failed to render URL previews:', e);
+    }
 }
