@@ -222,6 +222,56 @@ body {
     padding: var(--space-8);
 }
 
+/* Neutral card for URL previews */
+.url-previews-card {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #ffffff;
+}
+
+/* URL Previews */
+.url-previews {
+    display: grid;
+    gap: 10px;
+}
+
+.url-preview {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius);
+    background: #ffffff;
+}
+
+.url-preview .url-label {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.url-preview .url-link {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--gray-800);
+    word-break: break-all;
+}
+
+.url-actions {
+    display: inline-flex;
+    gap: 8px;
+}
+
+.btn-compact {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+}
+
 /* Toggle Settings - FIXED */
 .toggle-setting {
     display: flex;

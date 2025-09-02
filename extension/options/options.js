@@ -71,6 +71,19 @@ function cacheElements() {
         urlPreviews: document.getElementById('urlPreviews'),
         paidTimeMinutes: document.getElementById('paidTimeMinutes'),
         formatChimeManual: document.getElementById('formatChimeManual'),
+        // Risk alerts
+        enableRiskAlerts: document.getElementById('enableRiskAlerts'),
+        riskDashboardUrl: document.getElementById('riskDashboardUrl'),
+        slackWebhookUrl: document.getElementById('slackWebhookUrl'),
+        testRiskScan: document.getElementById('testRiskScan'),
+        thrBc: document.getElementById('thrBc'),
+        thrBcResidential: document.getElementById('thrBcResidential'),
+        thrCna: document.getElementById('thrCna'),
+        thrCnaFactor: document.getElementById('thrCnaFactor'),
+        thrMissing: document.getElementById('thrMissing'),
+        thrUta: document.getElementById('thrUta'),
+        thrUtl: document.getElementById('thrUtl'),
+        thrRejected: document.getElementById('thrRejected'),
         // Service type elements
         enableCycle1: document.getElementById('enableCycle1'),
         enableSamedayB: document.getElementById('enableSamedayB'),
@@ -157,12 +170,27 @@ async function loadGeneralSettings() {
         const serviceAreaId = settings.serviceAreaId || '';
         const schedulingBaseUrl = settings.schedulingBaseUrl || '';
         const routePlanningBaseUrl = settings.routePlanningBaseUrl || '';
+        const riskAlertsEnabled = settings.riskAlertsEnabled === true; // default off
+        const riskDashboardUrl = settings.riskDashboardUrl || '';
+        const slackWebhookUrl = settings.slackWebhookUrl || '';
+        const thr = settings.riskThresholds || { bc: 10, bcResidential: 5, cna: 25, cnaOutlierFactor: 1.5, missing: 1, uta: 5, utl: 5, rejected: 2 };
 
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = paidTime;
         if (elements.formatChimeManual) elements.formatChimeManual.checked = chimeFmt;
         if (elements.serviceAreaId) elements.serviceAreaId.value = serviceAreaId;
         if (elements.schedulingUrl) elements.schedulingUrl.value = schedulingBaseUrl;
         if (elements.routePlanningUrl) elements.routePlanningUrl.value = routePlanningBaseUrl;
+        if (elements.enableRiskAlerts) elements.enableRiskAlerts.checked = riskAlertsEnabled;
+        if (elements.riskDashboardUrl) elements.riskDashboardUrl.value = riskDashboardUrl;
+        if (elements.slackWebhookUrl) elements.slackWebhookUrl.value = slackWebhookUrl;
+        if (elements.thrBc) elements.thrBc.value = thr.bc;
+        if (elements.thrBcResidential) elements.thrBcResidential.value = thr.bcResidential;
+        if (elements.thrCna) elements.thrCna.value = thr.cna;
+        if (elements.thrCnaFactor) elements.thrCnaFactor.value = thr.cnaOutlierFactor;
+        if (elements.thrMissing) elements.thrMissing.value = thr.missing;
+        if (elements.thrUta) elements.thrUta.value = thr.uta;
+        if (elements.thrUtl) elements.thrUtl.value = thr.utl;
+        if (elements.thrRejected) elements.thrRejected.value = thr.rejected;
     } catch (error) {
         console.warn('⚠️ Failed to load general settings, using defaults');
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = 525;
@@ -170,6 +198,17 @@ async function loadGeneralSettings() {
         if (elements.serviceAreaId) elements.serviceAreaId.value = '';
         if (elements.schedulingUrl) elements.schedulingUrl.value = '';
         if (elements.routePlanningUrl) elements.routePlanningUrl.value = '';
+        if (elements.enableRiskAlerts) elements.enableRiskAlerts.checked = false;
+        if (elements.riskDashboardUrl) elements.riskDashboardUrl.value = '';
+        if (elements.slackWebhookUrl) elements.slackWebhookUrl.value = '';
+        if (elements.thrBc) elements.thrBc.value = 10;
+        if (elements.thrBcResidential) elements.thrBcResidential.value = 5;
+        if (elements.thrCna) elements.thrCna.value = 25;
+        if (elements.thrCnaFactor) elements.thrCnaFactor.value = 1.5;
+        if (elements.thrMissing) elements.thrMissing.value = 1;
+        if (elements.thrUta) elements.thrUta.value = 5;
+        if (elements.thrUtl) elements.thrUtl.value = 5;
+        if (elements.thrRejected) elements.thrRejected.value = 2;
     }
 }
 
@@ -644,6 +683,44 @@ function setupEventListeners() {
         elements.routePlanningUrl.addEventListener('change', saveGeneralSettings);
         elements.routePlanningUrl.addEventListener('blur', saveGeneralSettings);
     }
+    // Risk alerts listeners
+    if (elements.enableRiskAlerts) {
+        elements.enableRiskAlerts.addEventListener('change', async () => {
+            await saveGeneralSettings();
+            // Ask background to (re)configure risk scan alarm
+            try { await browser.runtime.sendMessage({ action: 'configureRiskAlarm' }); } catch {}
+        });
+    }
+    if (elements.riskDashboardUrl) {
+        elements.riskDashboardUrl.addEventListener('change', saveGeneralSettings);
+        elements.riskDashboardUrl.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.slackWebhookUrl) {
+        elements.slackWebhookUrl.addEventListener('change', saveGeneralSettings);
+        elements.slackWebhookUrl.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.testRiskScan) {
+        elements.testRiskScan.addEventListener('click', async () => {
+            showToast('Running risk scan...', 'loading');
+            try {
+                const res = await browser.runtime.sendMessage({ action: 'riskScanNow' });
+                if (res?.success) {
+                    showToast(`Risk scan complete: ${res.stats?.flagged || 0} alerts`, 'success');
+                } else {
+                    showToast(res?.error || 'Risk scan failed', 'error');
+                }
+            } catch (e) {
+                showToast(e.message || 'Risk scan failed', 'error');
+            }
+        });
+    }
+    // Threshold listeners
+    [elements.thrBc, elements.thrBcResidential, elements.thrCna, elements.thrCnaFactor, elements.thrMissing, elements.thrUta, elements.thrUtl, elements.thrRejected]
+      .filter(Boolean)
+      .forEach(el => {
+          el.addEventListener('change', saveGeneralSettings);
+          el.addEventListener('blur', saveGeneralSettings);
+      });
     if (elements.schedulingUrl) {
         elements.schedulingUrl.addEventListener('change', saveGeneralSettings);
         elements.schedulingUrl.addEventListener('blur', saveGeneralSettings);
@@ -694,6 +771,19 @@ async function saveGeneralSettings() {
         const serviceAreaId = (elements.serviceAreaId?.value || '').trim();
         const schedulingRaw = (elements.schedulingUrl?.value || '').trim();
         const routePlanningRaw = (elements.routePlanningUrl?.value || '').trim();
+        const riskAlertsEnabled = !!elements.enableRiskAlerts?.checked;
+        const riskDashboardUrl = (elements.riskDashboardUrl?.value || '').trim();
+        const slackWebhookUrl = (elements.slackWebhookUrl?.value || '').trim();
+        const thresholds = {
+            bc: parseInt(elements.thrBc?.value || '10', 10),
+            bcResidential: parseInt(elements.thrBcResidential?.value || '5', 10),
+            cna: parseInt(elements.thrCna?.value || '25', 10),
+            cnaOutlierFactor: parseFloat(elements.thrCnaFactor?.value || '1.5'),
+            missing: parseInt(elements.thrMissing?.value || '1', 10),
+            uta: parseInt(elements.thrUta?.value || '5', 10),
+            utl: parseInt(elements.thrUtl?.value || '5', 10),
+            rejected: parseInt(elements.thrRejected?.value || '2', 10),
+        };
 
         // Normalize URLs (strip dates, extract IDs)
         const { schedulingBaseUrl, parsedServiceAreaId } = normalizeSchedulingUrl(schedulingRaw, serviceAreaId);
@@ -706,9 +796,13 @@ async function saveGeneralSettings() {
         settings.serviceAreaId = parsedServiceAreaId;
         settings.schedulingBaseUrl = schedulingBaseUrl;
         settings.routePlanningBaseUrl = routePlanningBaseUrl;
+        settings.riskAlertsEnabled = riskAlertsEnabled;
+        settings.riskDashboardUrl = riskDashboardUrl;
+        settings.slackWebhookUrl = slackWebhookUrl;
+        settings.riskThresholds = thresholds;
 
         await browser.storage.local.set({ settings });
-        showToast('Saved output settings', 'success');
+        showToast('Saved settings', 'success');
         await renderUrlPreviews();
     } catch (error) {
         console.error('❌ Error saving general settings:', error);
@@ -1450,27 +1544,53 @@ async function renderUrlPreviews() {
         const routeToday = buildRoutePlanningUrl(settings, today);
         if (!elements.urlPreviews) return;
         while (elements.urlPreviews.firstChild) elements.urlPreviews.removeChild(elements.urlPreviews.firstChild);
-        const lines = [
+        const items = [
             { label: 'Scheduling (Cycle 1 - tomorrow)', url: schedCycle1 },
             { label: 'Scheduling (Today)', url: schedToday },
             { label: 'Route Planning (Today)', url: routeToday }
         ];
-        lines.forEach(line => {
+        items.forEach(item => {
             const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.flexDirection = 'column';
-            row.style.marginBottom = '8px';
-            const label = document.createElement('strong');
-            label.textContent = line.label;
-            label.style.marginBottom = '4px';
+            row.className = 'url-preview';
+
+            const label = document.createElement('div');
+            label.className = 'url-label';
+            label.textContent = item.label;
+
+            const actions = document.createElement('div');
+            actions.className = 'url-actions';
+
+            const openBtn = document.createElement('button');
+            openBtn.className = 'btn btn-secondary btn-compact';
+            openBtn.type = 'button';
+            openBtn.textContent = 'Open';
+            openBtn.addEventListener('click', () => window.open(item.url, '_blank', 'noopener'));
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'btn btn-compact';
+            copyBtn.type = 'button';
+            copyBtn.textContent = 'Copy';
+            copyBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(item.url);
+                    showToast('Copied link to clipboard', 'success');
+                } catch {
+                    showToast('Copy failed', 'error');
+                }
+            });
+
+            actions.appendChild(openBtn);
+            actions.appendChild(copyBtn);
+
             const link = document.createElement('a');
-            link.href = line.url;
-            link.textContent = line.url;
+            link.className = 'url-link';
+            link.href = item.url;
+            link.textContent = item.url;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
-            link.style.fontFamily = 'var(--font-mono, monospace)';
-            link.style.wordBreak = 'break-all';
+
             row.appendChild(label);
+            row.appendChild(actions);
             row.appendChild(link);
             elements.urlPreviews.appendChild(row);
         });
