@@ -37,6 +37,8 @@ function cacheElements() {
         messageInput: document.getElementById('message'),
         charCount: document.getElementById('charCount'),
         checkNowButton: document.getElementById('checkNow'),
+        copySummaryButton: document.getElementById('copySummary'),
+        sendSummaryButton: document.getElementById('sendSummary'),
         sendMessageButton: document.getElementById('sendMessage'),
         openSettingsButton: document.getElementById('openSettings'),
         individualDspGroup: document.getElementById('individualDspGroup'),
@@ -63,6 +65,16 @@ function setupEventListeners() {
         elements.sendMessageButton.addEventListener('click', handleSendMessage);
     }
 
+    // Copy DSP Summary button
+    if (elements.copySummaryButton) {
+        elements.copySummaryButton.addEventListener('click', handleCopySummary);
+    }
+
+    // Send DSP Summary button
+    if (elements.sendSummaryButton) {
+        elements.sendSummaryButton.addEventListener('click', handleSendSummary);
+    }
+
     // Settings button
     if (elements.openSettingsButton) {
         elements.openSettingsButton.addEventListener('click', handleOpenSettings);
@@ -76,6 +88,137 @@ function setupEventListeners() {
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', handleGlobalKeydown);
+}
+
+async function handleCopySummary() {
+    if (isLoading) return;
+
+    const selectedDSPs = getSelectedDSPs();
+    if (selectedDSPs.length === 0) {
+        showToast('⚠️ Select DSP(s) below first', 'error');
+        return;
+    }
+
+    try {
+        setButtonLoading(elements.copySummaryButton, true);
+        showToast('Generating DSP summary...', 'loading');
+
+        // Get active tab
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (!tabs || tabs.length === 0) {
+            throw new Error('No active tab found');
+        }
+
+        const tab = tabs[0];
+        const response = await browser.tabs.sendMessage(tab.id, {
+            action: 'getDSPSummary',
+            dsps: selectedDSPs
+        });
+
+        if (!response?.success) {
+            throw new Error(response?.error || 'Failed to generate summary');
+        }
+
+        const text = response.text || '';
+        if (!text) {
+            showToast('No matching rows found on page', 'error');
+            return;
+        }
+
+        await navigator.clipboard.writeText(text);
+        showToast('✅ DSP summary copied to clipboard', 'success');
+    } catch (error) {
+        console.error('Copy summary failed:', error);
+        showToast(`❌ ${error.message}`, 'error');
+    } finally {
+        setButtonLoading(elements.copySummaryButton, false);
+    }
+}
+
+async function handleSendSummary() {
+    if (isLoading) return;
+
+    const selectedDSPs = getSelectedDSPs();
+    if (selectedDSPs.length === 0) {
+        showToast('⚠️ Select DSP(s) below first', 'error');
+        return;
+    }
+
+    try {
+        setButtonLoading(elements.sendSummaryButton, true);
+        showToast('Generating and sending summaries...', 'loading');
+
+        // Find a Route Planning tab (active first, else any matching). If none, open a new one.
+        let tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        let targetTab = tabs && tabs[0];
+        let isRoutePlanning = !!(targetTab?.url && targetTab.url.includes('.route.planning.last-mile.a2z.com/route-planning'));
+        if (!isRoutePlanning) {
+            const matches = await browser.tabs.query({ url: '*://*.route.planning.last-mile.a2z.com/route-planning/*' });
+            if (matches && matches.length > 0) {
+                targetTab = matches[0];
+            } else {
+                // Open a generic Route Planning entry page
+                console.log('🆕 Opening Route Planning page (fallback)...');
+                targetTab = await browser.tabs.create({ url: 'https://eu.route.planning.last-mile.a2z.com/route-planning', active: false });
+                // wait for the app shell to initialize
+                await new Promise(r => setTimeout(r, 7000));
+            }
+        }
+
+        // Ask content script for per-DSP summary values
+        const response = await browser.tabs.sendMessage(targetTab.id, {
+            action: 'getDSPSummary',
+            dsps: selectedDSPs
+        });
+
+        if (!response?.success) {
+            throw new Error(response?.error || 'Failed to generate summaries');
+        }
+
+        const { items = {}, paidTime } = response;
+        let success = 0; let failed = 0;
+
+        for (const dsp of selectedDSPs) {
+            const item = items[dsp];
+            if (!item) {
+                failed++;
+                console.warn(`No data found for ${dsp}`);
+                continue;
+            }
+
+            const { avgShift, avgSpr } = item;
+            // Build Chime Markdown message consistent with other alerts
+            const message = `/md #### 📊 DSP Summary: ${dsp} (Standard Parcel Only)\n\n` +
+                `| DSP | Shift Time Minutes | Avg. of SPR | Paid Time Minutes |\n` +
+                `|---|---:|---:|---:|\n` +
+                `| ${dsp} | ${avgShift} | ${avgSpr} | ${paidTime} |\n` +
+                `| Grand Total | ${avgShift} | ${avgSpr} | ${paidTime} |`;
+
+            const result = await browser.runtime.sendMessage({
+                action: 'sendMessage',
+                dsp,
+                message
+            });
+
+            if (result?.success) success++; else failed++;
+
+            // Gentle pacing
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        if (success > 0 && failed === 0) {
+            showToast(`✅ Sent ${success} summary${success !== 1 ? 'ies' : ''}`, 'success');
+        } else if (success > 0) {
+            showToast(`⚠️ Sent ${success}, failed ${failed}`, 'error');
+        } else {
+            showToast('❌ Failed to send any summaries', 'error');
+        }
+    } catch (error) {
+        console.error('Send summary failed:', error);
+        showToast(`❌ ${error.message}`, 'error');
+    } finally {
+        setButtonLoading(elements.sendSummaryButton, false);
+    }
 }
 
 async function loadDSPOptions() {
@@ -278,6 +421,31 @@ async function handleCheckNow() {
     showToast('Checking for mismatches...', 'loading');
 
     try {
+        // Ensure rostering page is open (fallback): prefer cycle1 date if enabled
+        try {
+            const [{ serviceTypes = {} } = {}, { settings = {} } = {}] = await Promise.all([
+                browser.storage.local.get('serviceTypes'),
+                browser.storage.local.get('settings')
+            ]);
+            const cycle1Enabled = serviceTypes.cycle1 !== false; // default true if unset
+            const dateStr = computeDateParam(cycle1Enabled ? 'cycle1' : 'other');
+            const saId = settings.serviceAreaId || '';
+            const baseUrl = 'https://logistics.amazon.co.uk/internal/scheduling/dsps';
+            const params = new URLSearchParams();
+            if (saId) params.set('serviceAreaId', saId);
+            params.set('date', dateStr);
+            const targetUrl = `${baseUrl}?${params.toString()}`;
+
+            let rosteringTabs = await browser.tabs.query({ url: baseUrl + '*' });
+            if (!rosteringTabs || rosteringTabs.length === 0) {
+                console.log('🆕 Opening rostering page (fallback)...');
+                await browser.tabs.create({ url: targetUrl, active: false });
+                await new Promise(r => setTimeout(r, 5000));
+            }
+        } catch (e) {
+            console.warn('Rostering fallback open failed or skipped:', e);
+        }
+
         const response = await browser.runtime.sendMessage({ action: "manualCheck" });
         console.log('✅ Manual check response:', response);
 
@@ -292,6 +460,18 @@ async function handleCheckNow() {
     } finally {
         setButtonLoading(elements.checkNowButton, false);
     }
+}
+
+function computeDateParam(serviceType) {
+    const now = new Date();
+    const date = new Date(now);
+    if (serviceType === 'cycle1') {
+        date.setDate(date.getDate() + 1);
+    }
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 async function handleSendMessage() {

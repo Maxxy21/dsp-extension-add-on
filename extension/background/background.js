@@ -56,6 +56,21 @@ browser.runtime.onInstalled.addListener(async () => {
     console.log('DSP Management Tool installed, notifications:', notificationsEnabled ? 'enabled' : 'disabled');
 });
 
+// Ensure alarms exist on browser startup as well
+browser.runtime.onStartup.addListener(async () => {
+    try {
+        const notificationsEnabled = await getNotificationSettings();
+        if (notificationsEnabled) {
+            await createServiceTypeAlarms();
+            console.log('DSP Management Tool startup: alarms ensured');
+        } else {
+            console.log('DSP Management Tool startup: notifications disabled');
+        }
+    } catch (e) {
+        console.warn('Error ensuring alarms on startup:', e);
+    }
+});
+
 async function createServiceTypeAlarms() {
     try {
         console.log('🔔 Creating service type alarms...');
@@ -134,7 +149,7 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
         
         if (alarm.name.includes('cycle1')) {
             serviceType = 'cycle1';
-            alarmTime = alarm.name.includes('_14') ? '14:00' : '15:00';
+            alarmTime = alarm.name.includes('_14') ? '14:00' : '15:30';
         } else if (alarm.name.includes('samedayB')) {
             serviceType = 'samedayB';
             alarmTime = '10:00';
@@ -164,8 +179,20 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
                 await checkAllEnabledServiceTypes();
                 return { success: true };
                 
-            case "sendMessage":
-                return await sendWebhookMessage(request.dsp, request.message);
+            case "sendMessage": {
+                // Optionally wrap manual messages for Chime markdown
+                let msg = request.message || '';
+                try {
+                    const { settings = {} } = await browser.storage.local.get('settings');
+                    const chimeFmt = settings.formatManualMessagesForChime !== false; // default true
+                    if (chimeFmt && typeof msg === 'string' && !msg.trim().startsWith('/md')) {
+                        msg = `/md ${msg}`;
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Could not load settings for message formatting');
+                }
+                return await sendWebhookMessage(request.dsp, msg);
+            }
                 
             case "updateNotificationSettings":
                 await updateNotificationSettings(request.enabled);
@@ -240,24 +267,31 @@ async function checkDSPMismatches(serviceType, alarmName) {
     try {
         console.log(`🔍 Starting DSP mismatch check for ${serviceType}...`);
 
-        const tabs = await browser.tabs.query({
-            url: "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
-        });
+        // Compute date parameter: cycle1 = today+1, others = today
+        const dateStr = getServiceDateParam(serviceType);
+        const { settings = {} } = await browser.storage.local.get('settings');
+        const serviceAreaId = settings.serviceAreaId || '';
+
+        const baseUrl = 'https://logistics.amazon.co.uk/internal/scheduling/dsps';
+        const params = new URLSearchParams();
+        if (serviceAreaId) params.set('serviceAreaId', serviceAreaId);
+        if (dateStr) params.set('date', dateStr);
+        const targetUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+
+        // Reuse an existing rostering tab if present; otherwise open one
+        const tabs = await browser.tabs.query({ url: baseUrl + '*' });
 
         let dspTab;
         let createdNewTab = false;
 
         if (tabs.length > 0) {
             dspTab = tabs[0];
-            console.log('📄 Found existing DSP tab, reloading...');
-            await browser.tabs.reload(dspTab.id);
+            console.log('📄 Found existing DSP tab, navigating to target date...');
+            await browser.tabs.update(dspTab.id, { url: targetUrl, active: false });
         } else {
             // Only create new tab for production site, not for local testing
             console.log('🆕 Creating new DSP tab...');
-            dspTab = await browser.tabs.create({
-                url: "https://logistics.amazon.co.uk/internal/scheduling/dsps",
-                active: false
-            });
+            dspTab = await browser.tabs.create({ url: targetUrl, active: false });
             createdNewTab = true;
         }
 
@@ -305,6 +339,19 @@ async function checkDSPMismatches(serviceType, alarmName) {
         console.error(`❌ Error in checkDSPMismatches for ${serviceType}:`, error);
         throw error;
     }
+}
+
+function getServiceDateParam(serviceType) {
+    // Use local time
+    const now = new Date();
+    const date = new Date(now);
+    if (serviceType === 'cycle1') {
+        date.setDate(date.getDate() + 1);
+    }
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 async function scheduleFollowUpNotification(mismatches, serviceType, originalAlarmName) {

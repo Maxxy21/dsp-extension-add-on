@@ -1,4 +1,4 @@
-// content/content.js - Enhanced with multi-service type support
+// content/content.js - Enhanced with multi-service type support and DSP summary export for Route Planning
 
 // Configuration constants
 const CONFIG = {
@@ -19,6 +19,10 @@ const CONFIG = {
         STANDARD_PARCEL_MEDIUM_VAN: 'Standard Parcel Medium Van',
         MULTI_USE: 'Multi-Use',
         SAMEDAY_PARCEL: 'Sameday Parcel'
+    },
+    SUMMARY: {
+        INCLUDED_SERVICE_TYPES: ['Standard Parcel', 'Standard Parcel Medium Van'],
+        PAID_TIME_MINUTES: 525
     }
 };
 
@@ -439,6 +443,7 @@ class DSPManagementTool {
         this.highlighter = new MismatchHighlighter();
         this.initialized = false;
         this.highlightTimeout = null;
+        this._isRoutePlanning = /\.route\.planning\.last-mile\.a2z\.com/.test(location.hostname);
     }
 
     initialize() {
@@ -467,14 +472,13 @@ class DSPManagementTool {
     async setupTool() {
         console.log('DSP Tool: Setting up tool...');
         
-        // Initialize service type inference (similar to amzl-scripts approach)
-        this.dspParser.serviceInferrer.initialize();
-        
-        // Auto-update service types based on page detection
-        await this.dspParser.serviceInferrer.updateStorageWithDetected();
-        
-        this.setupHighlighting();
-        this.setupTableObserver();
+        // On Scheduling page, enable mismatch highlighting + inference
+        if (!this._isRoutePlanning) {
+            this.dspParser.serviceInferrer.initialize();
+            await this.dspParser.serviceInferrer.updateStorageWithDetected();
+            this.setupHighlighting();
+            this.setupTableObserver();
+        }
     }
 
     async setupHighlighting() {
@@ -619,5 +623,102 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
         }
     }
     
+    // Export DSP summaries from Route Planning page (Standard Parcel only)
+    if (request.action === 'getDSPSummary') {
+        try {
+            const dspList = Array.isArray(request.dsps) ? request.dsps : [];
+            const { settings = {} } = await browser.storage.local.get('settings');
+            const paidTime = Number.isFinite(settings.paidTimeMinutes) ? settings.paidTimeMinutes : CONFIG.SUMMARY.PAID_TIME_MINUTES;
+            const { items, text } = extractAndFormatDSPSummariesFromRoutePlanning(dspList, paidTime);
+            return Promise.resolve({ success: true, text, items, paidTime });
+        } catch (error) {
+            console.error('DSP Tool: Error generating DSP summary:', error);
+            return Promise.resolve({ success: false, error: error.message });
+        }
+    }
+    
     return Promise.resolve({ success: true });
 });
+
+// -------------------------------
+// Route Planning Summary Export
+// -------------------------------
+
+function extractAndFormatDSPSummariesFromRoutePlanning(targetDSPs = [], paidTimeMinutes = CONFIG.SUMMARY.PAID_TIME_MINUTES) {
+    // Guard: only proceed on Route Planning pages
+    const isRoutePlanning = /\.route\.planning\.last-mile\.a2z\.com/.test(location.hostname);
+    if (!isRoutePlanning) {
+        throw new Error('Not on Route Planning page');
+    }
+
+    // Find the main data table(s). Route Planning uses generic <table> markup.
+    const tables = Array.from(document.querySelectorAll('table'));
+    if (!tables || tables.length === 0) {
+        throw new Error('No tables found on page');
+    }
+
+    // Aggregate rows across all tables; use structure seen in raw.html
+    const rows = [];
+    tables.forEach(tbl => {
+        const bodyRows = tbl.querySelectorAll('tbody > tr');
+        bodyRows.forEach(tr => rows.push(tr));
+    });
+
+    // Parse rows -> records
+    const records = [];
+    for (const tr of rows) {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length < 8) continue;
+
+        const serviceType = (tds[0]?.innerText || '').trim();
+        const dsp = (tds[1]?.innerText || '').trim();
+        const shiftTime = Utils.parseInteger((tds[2]?.innerText || '').trim());
+        const spr = Utils.parseInteger((tds[7]?.innerText || '').trim());
+
+        // Filter: service type must be one of the included; skip empty DSPs
+        if (!CONFIG.SUMMARY.INCLUDED_SERVICE_TYPES.includes(serviceType)) continue;
+        if (!dsp) continue;
+        if (!Number.isFinite(shiftTime) || !Number.isFinite(spr)) continue;
+
+        records.push({ serviceType, dsp, shiftTime, spr });
+    }
+
+    // Group by DSP and compute averages
+    const agg = new Map(); // dsp -> { totalShift, totalSpr, count }
+    for (const r of records) {
+        if (!agg.has(r.dsp)) agg.set(r.dsp, { totalShift: 0, totalSpr: 0, count: 0 });
+        const a = agg.get(r.dsp);
+        a.totalShift += r.shiftTime;
+        a.totalSpr += r.spr;
+        a.count += 1;
+    }
+
+    // If targetDSPs provided, restrict output
+    const dspKeys = targetDSPs.length > 0
+        ? targetDSPs.filter(d => agg.has(d))
+        : Array.from(agg.keys());
+
+    // Format summaries
+    const items = {};
+    const parts = [];
+    for (const dsp of dspKeys.sort()) {
+        const a = agg.get(dsp);
+        if (!a || a.count === 0) continue;
+        const avgShift = Math.round(a.totalShift / a.count);
+        const avgSpr = Math.round(a.totalSpr / a.count);
+
+        items[dsp] = { avgShift, avgSpr, paid: paidTimeMinutes };
+
+        const block = [
+            `DSP Summary: ${dsp} (Standard Parcel Only)`,
+            '',
+            'DSP\tShift Time Minutes\tAvg. of SPR\tPaid Time Minutes',
+            `${dsp}\t${avgShift}\t${avgSpr}\t${paidTimeMinutes}`,
+            `Grand Total\t${avgShift}\t${avgSpr}\t${paidTimeMinutes}`
+        ].join('\n');
+
+        parts.push(block);
+    }
+
+    return { items, text: parts.join('\n\n') };
+}

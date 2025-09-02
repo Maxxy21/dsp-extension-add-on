@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "DSP Roster Management Tool",
-  "version": "1.6.18",
+  "version": "1.6.19",
   "description": "DSP rostering management with automatic notifications and messaging. Cross-browser compatible with multi-service type support.",
   "permissions": [
     "alarms",
@@ -23,7 +23,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://logistics.amazon.co.uk/internal/scheduling/dsps*"
+        "https://logistics.amazon.co.uk/internal/scheduling/dsps*",
+        "https://*.route.planning.last-mile.a2z.com/route-planning/*"
       ],
       "js": [
         "browser-polyfill.js",

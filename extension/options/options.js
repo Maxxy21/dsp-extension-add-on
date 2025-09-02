@@ -65,6 +65,8 @@ function cacheElements() {
         addWebhookBtn: document.getElementById('addWebhook'),
         enableNotifications: document.getElementById('enableNotifications'),
         toast: document.getElementById('status'),
+        paidTimeMinutes: document.getElementById('paidTimeMinutes'),
+        formatChimeManual: document.getElementById('formatChimeManual'),
         // Service type elements
         enableCycle1: document.getElementById('enableCycle1'),
         enableSamedayB: document.getElementById('enableSamedayB'),
@@ -122,6 +124,9 @@ async function loadSettings() {
         // Load service type settings
         await loadServiceTypeSettings();
 
+        // Load general/output settings
+        await loadGeneralSettings();
+
         // Load webhooks
         await loadWebhooks();
 
@@ -134,6 +139,25 @@ async function loadSettings() {
     } catch (error) {
         console.error('❌ Error loading settings:', error);
         throw new Error('Failed to load settings from storage');
+    }
+}
+
+async function loadGeneralSettings() {
+    try {
+        const result = await browser.storage.local.get(['settings']);
+        const settings = result.settings || {};
+        const paidTime = Number.isFinite(settings.paidTimeMinutes) ? settings.paidTimeMinutes : 525;
+        const chimeFmt = settings.formatManualMessagesForChime !== false; // default true
+        const serviceAreaId = settings.serviceAreaId || '';
+
+        if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = paidTime;
+        if (elements.formatChimeManual) elements.formatChimeManual.checked = chimeFmt;
+        if (elements.serviceAreaId) elements.serviceAreaId.value = serviceAreaId;
+    } catch (error) {
+        console.warn('⚠️ Failed to load general settings, using defaults');
+        if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = 525;
+        if (elements.formatChimeManual) elements.formatChimeManual.checked = true;
+        if (elements.serviceAreaId) elements.serviceAreaId.value = '';
     }
 }
 
@@ -588,6 +612,19 @@ function setupEventListeners() {
     // Batch input event listeners
     setupBatchInputListeners();
 
+    // General/output settings listeners
+    if (elements.paidTimeMinutes) {
+        elements.paidTimeMinutes.addEventListener('change', saveGeneralSettings);
+        elements.paidTimeMinutes.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.formatChimeManual) {
+        elements.formatChimeManual.addEventListener('change', saveGeneralSettings);
+    }
+    if (elements.serviceAreaId) {
+        elements.serviceAreaId.addEventListener('change', saveGeneralSettings);
+        elements.serviceAreaId.addEventListener('blur', saveGeneralSettings);
+    }
+
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey || e.metaKey) {
@@ -619,6 +656,27 @@ function setupEventListeners() {
     });
 
     console.log('✅ Event listeners set up successfully');
+}
+
+async function saveGeneralSettings() {
+    try {
+        const paid = parseInt(elements.paidTimeMinutes?.value || '525', 10);
+        const paidTimeMinutes = Number.isFinite(paid) ? paid : 525;
+        const formatManualMessagesForChime = !!elements.formatChimeManual?.checked;
+        const serviceAreaId = (elements.serviceAreaId?.value || '').trim();
+
+        const result = await browser.storage.local.get(['settings']);
+        const settings = result.settings || {};
+        settings.paidTimeMinutes = paidTimeMinutes;
+        settings.formatManualMessagesForChime = formatManualMessagesForChime;
+        settings.serviceAreaId = serviceAreaId;
+
+        await browser.storage.local.set({ settings });
+        showToast('Saved output settings', 'success');
+    } catch (error) {
+        console.error('❌ Error saving general settings:', error);
+        showToast('Failed to save output settings', 'error');
+    }
 }
 
 async function saveNotificationSettings(enabled) {
