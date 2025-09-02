@@ -219,6 +219,10 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
                 const stats = await runRiskScan();
                 return { success: true, stats };
             }
+            case "resetRiskDedupe": {
+                await browser.storage.local.set({ riskAlertState: {} });
+                return { success: true };
+            }
             
             default:
                 return { success: false, error: 'Unknown action' };

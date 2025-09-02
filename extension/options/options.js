@@ -76,6 +76,7 @@ function cacheElements() {
         riskDashboardUrl: document.getElementById('riskDashboardUrl'),
         slackWebhookUrl: document.getElementById('slackWebhookUrl'),
         testRiskScan: document.getElementById('testRiskScan'),
+        resetRiskDedupe: document.getElementById('resetRiskDedupe'),
         slackUseChimeMarkdown: document.getElementById('slackUseChimeMarkdown'),
         thrBc: document.getElementById('thrBc'),
         thrBcResidential: document.getElementById('thrBcResidential'),
@@ -727,6 +728,16 @@ function setupEventListeners() {
                 }
             } catch (e) {
                 showToast(e.message || 'Risk scan failed', 'error');
+            }
+        });
+    }
+    if (elements.resetRiskDedupe) {
+        elements.resetRiskDedupe.addEventListener('click', async () => {
+            try {
+                await browser.runtime.sendMessage({ action: 'resetRiskDedupe' });
+                showToast("Today's alert state cleared", 'success');
+            } catch (e) {
+                showToast('Reset failed: ' + (e.message || 'unknown error'), 'error');
             }
         });
     }
