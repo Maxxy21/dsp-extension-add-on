@@ -68,6 +68,7 @@ function cacheElements() {
         serviceAreaId: document.getElementById('serviceAreaId'),
         schedulingUrl: document.getElementById('schedulingUrl'),
         routePlanningUrl: document.getElementById('routePlanningUrl'),
+        urlPreviews: document.getElementById('urlPreviews'),
         paidTimeMinutes: document.getElementById('paidTimeMinutes'),
         formatChimeManual: document.getElementById('formatChimeManual'),
         // Service type elements
@@ -129,6 +130,8 @@ async function loadSettings() {
 
         // Load general/output settings
         await loadGeneralSettings();
+        // Render URL previews
+        await renderUrlPreviews();
 
         // Load webhooks
         await loadWebhooks();
@@ -641,6 +644,14 @@ function setupEventListeners() {
         elements.routePlanningUrl.addEventListener('change', saveGeneralSettings);
         elements.routePlanningUrl.addEventListener('blur', saveGeneralSettings);
     }
+    if (elements.schedulingUrl) {
+        elements.schedulingUrl.addEventListener('change', saveGeneralSettings);
+        elements.schedulingUrl.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.routePlanningUrl) {
+        elements.routePlanningUrl.addEventListener('change', saveGeneralSettings);
+        elements.routePlanningUrl.addEventListener('blur', saveGeneralSettings);
+    }
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -698,6 +709,7 @@ async function saveGeneralSettings() {
 
         await browser.storage.local.set({ settings });
         showToast('Saved output settings', 'success');
+        await renderUrlPreviews();
     } catch (error) {
         console.error('❌ Error saving general settings:', error);
         showToast('Failed to save output settings', 'error');
