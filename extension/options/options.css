@@ -227,13 +227,13 @@ body {
     padding: 12px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: #ffffff;
+    background: var(--surface);
 }
 
 /* URL Previews */
 .url-previews {
     display: grid;
-    gap: 10px;
+    gap: 0;
 }
 
 .url-preview {
@@ -242,9 +242,11 @@ body {
     gap: 8px 12px;
     align-items: center;
     padding: 12px 14px;
-    border: 1px solid var(--gray-300);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: #ffffff;
+    background: var(--background);
+    transition: var(--transition);
+    position: relative;
 }
 
 .url-preview .url-label {
@@ -257,13 +259,62 @@ body {
     font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
     font-size: 13px;
     line-height: 1.45;
-    color: var(--gray-800);
+    color: var(--text-secondary);
     word-break: break-all;
+}
+
+/* Neutral subsection container for settings (thresholds, etc.) */
+.section-subtle {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: var(--space-4);
 }
 
 .url-actions {
     display: inline-flex;
     gap: 8px;
+}
+
+.url-preview:hover {
+    border-color: var(--gray-300);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+.url-preview:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Tiny divider between stacked preview rows */
+.url-preview + .url-preview {
+    margin-top: 10px;
+}
+
+.url-preview + .url-preview::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
+}
+
+/* Make plain compact buttons look intentional (used for Copy) */
+.btn.btn-compact:not(.btn-primary):not(.btn-secondary):not(.btn-ghost) {
+    background: var(--surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.btn.btn-compact:not(.btn-primary):not(.btn-secondary):not(.btn-ghost):hover {
+    background: var(--background);
+    border-color: var(--gray-300);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
 }
 
 .btn-compact {

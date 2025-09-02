@@ -705,7 +705,12 @@ function setupEventListeners() {
             try {
                 const res = await browser.runtime.sendMessage({ action: 'riskScanNow' });
                 if (res?.success) {
-                    showToast(`Risk scan complete: ${res.stats?.flagged || 0} alerts`, 'success');
+                    const s = res.stats || {};
+                    if ((s.flagged || 0) > 0 && (s.notified || 0) === 0) {
+                        showToast(`Flagged ${s.flagged} but sent 0. Check DSP webhooks and Slack URL.`, 'warning');
+                    } else {
+                        showToast(`Risk scan: flagged ${s.flagged || 0}, notified ${s.notified || 0}`, 'success');
+                    }
                 } else {
                     showToast(res?.error || 'Risk scan failed', 'error');
                 }

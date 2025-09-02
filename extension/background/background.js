@@ -883,7 +883,7 @@ async function notifyRiskAlerts(items, slackWebhookUrl) {
     items = await dedupeRisks(items);
 
     for (const it of items) {
-        const dsp = (it.dsp || '').trim();
+        const dsp = (it.dsp || '').trim().toUpperCase();
         const dspWebhook = webhooks[dsp];
         const header = `🚨 Risk Alert: ${it.type}`;
         const details = `Date: ${it.date}\nDSP: ${dsp}\nRoute: ${it.routeId || '-'}\nTransporter: ${it.transporterId || '-'}\nCount: ${it.count}\nReason: ${it.reason || it.reasonText || '-'}`;
