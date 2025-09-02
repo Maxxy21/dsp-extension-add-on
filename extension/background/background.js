@@ -713,7 +713,9 @@ async function getRiskSettings() {
         enabled: settings.riskAlertsEnabled === true,
         dashboardUrl: settings.riskDashboardUrl || '',
         slackWebhookUrl: settings.slackWebhookUrl || '',
-        thresholds: thr
+        slackUseChimeMarkdown: settings.slackUseChimeMarkdown === true,
+        thresholds: thr,
+        renotifyStep: Number.isFinite(settings.riskRenotifyStep) ? settings.riskRenotifyStep : 5
     };
 }
 
@@ -797,7 +799,7 @@ async function runRiskScan() {
         stats.flagged = flagged.length;
         if (flagged.length === 0) return stats;
 
-        const notifyResults = await notifyRiskAlerts(flagged, risk.slackWebhookUrl);
+        const notifyResults = await notifyRiskAlerts(flagged, risk.slackWebhookUrl, risk.renotifyStep);
         stats.notified = notifyResults.filter(r => r.success).length;
         return stats;
     } catch (e) {
@@ -848,13 +850,13 @@ function buildRiskKey(item) {
     return parts.join('|');
 }
 
-async function dedupeRisks(items) {
+async function dedupeRisks(items, renotifyStep = 5) {
     const { riskAlertState = {} } = await browser.storage.local.get('riskAlertState');
     const out = [];
     for (const it of items) {
         const key = buildRiskKey(it);
         const prev = riskAlertState[key];
-        if (!prev || parseIntSafe(it.count) > parseIntSafe(prev.count)) {
+        if (!prev || parseIntSafe(it.count) >= parseIntSafe(prev.count) + renotifyStep) {
             out.push(it);
             riskAlertState[key] = { count: parseIntSafe(it.count), notifiedAt: Date.now() };
         }
@@ -875,12 +877,12 @@ async function ensureRiskStateForToday() {
     }
 }
 
-async function notifyRiskAlerts(items, slackWebhookUrl) {
+async function notifyRiskAlerts(items, slackWebhookUrl, renotifyStep) {
     const results = [];
     const { webhooks = {} } = await browser.storage.local.get('webhooks');
 
     // Dedupe based on last notified counts
-    items = await dedupeRisks(items);
+    items = await dedupeRisks(items, renotifyStep);
 
     for (const it of items) {
         const dsp = (it.dsp || '').trim().toUpperCase();
@@ -899,8 +901,9 @@ async function notifyRiskAlerts(items, slackWebhookUrl) {
         }
 
         if (slackWebhookUrl) {
-            const slackText = `${header} | ${dsp} | ${it.date} | Route ${it.routeId || '-'} | Count ${it.count}\n${it.reason || ''}${pageHint}`;
-            const sr = await sendSlackMessage(slackWebhookUrl, slackText);
+            const { slackUseChimeMarkdown } = await getRiskSettings();
+            const slackMsg = slackUseChimeMarkdown ? chimeMsg : stripChimePrefix(chimeMsg);
+            const sr = await sendSlackMessage(slackWebhookUrl, slackMsg);
             results.push({ dsp: 'slack', success: sr.success, error: sr.error });
         }
     }
@@ -920,5 +923,13 @@ async function sendSlackMessage(webhookUrl, text) {
     } catch (e) {
         console.warn('Slack webhook failed:', e);
         return { success: false, error: e.message };
+    }
+}
+
+function stripChimePrefix(message) {
+    try {
+        return message.replace(/^\s*\/md\s+/, '');
+    } catch {
+        return message;
     }
 }

@@ -112,6 +112,16 @@
                                 <input type="url" id="slackWebhookUrl" placeholder="https://hooks.slack.com/services/..." />
                                 <small>Used to post weekly risk alerts to your Slack workflow</small>
                             </div>
+                            <div class="toggle-setting" style="flex: 1; min-width: 320px;">
+                                <div class="toggle-info">
+                                    <label class="toggle-label" for="slackUseChimeMarkdown">Use Chime Markdown in Slack</label>
+                                    <p class="toggle-description">If off, removes the <code>/md</code> prefix for Slack</p>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="slackUseChimeMarkdown">
+                                    <label for="slackUseChimeMarkdown" class="switch"></label>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="actions-row" style="margin-top: 8px;">
@@ -155,9 +165,14 @@
                                             <label for="thrRejected">Rejected/Delayed by DA threshold</label>
                                             <input type="number" id="thrRejected" min="0" step="1" placeholder="2" />
                                         </div>
+                                        <div class="webhook-field">
+                                            <label for="thrRenotifyStep">Re-notify step (increase by ≥)</label>
+                                            <input type="number" id="thrRenotifyStep" min="1" step="1" placeholder="5" />
+                                            <small>Only re-send if the count increased by at least this amount</small>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         </div>
                     </div>
                 </div>

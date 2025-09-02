@@ -76,6 +76,7 @@ function cacheElements() {
         riskDashboardUrl: document.getElementById('riskDashboardUrl'),
         slackWebhookUrl: document.getElementById('slackWebhookUrl'),
         testRiskScan: document.getElementById('testRiskScan'),
+        slackUseChimeMarkdown: document.getElementById('slackUseChimeMarkdown'),
         thrBc: document.getElementById('thrBc'),
         thrBcResidential: document.getElementById('thrBcResidential'),
         thrCna: document.getElementById('thrCna'),
@@ -84,6 +85,7 @@ function cacheElements() {
         thrUta: document.getElementById('thrUta'),
         thrUtl: document.getElementById('thrUtl'),
         thrRejected: document.getElementById('thrRejected'),
+        thrRenotifyStep: document.getElementById('thrRenotifyStep'),
         // Service type elements
         enableCycle1: document.getElementById('enableCycle1'),
         enableSamedayB: document.getElementById('enableSamedayB'),
@@ -173,7 +175,9 @@ async function loadGeneralSettings() {
         const riskAlertsEnabled = settings.riskAlertsEnabled === true; // default off
         const riskDashboardUrl = settings.riskDashboardUrl || '';
         const slackWebhookUrl = settings.slackWebhookUrl || '';
+        const slackUseChimeMarkdown = settings.slackUseChimeMarkdown === true; // default false
         const thr = settings.riskThresholds || { bc: 10, bcResidential: 5, cna: 25, cnaOutlierFactor: 1.5, missing: 1, uta: 5, utl: 5, rejected: 2 };
+        const renotifyStep = Number.isFinite(settings.riskRenotifyStep) ? settings.riskRenotifyStep : 5;
 
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = paidTime;
         if (elements.formatChimeManual) elements.formatChimeManual.checked = chimeFmt;
@@ -183,6 +187,7 @@ async function loadGeneralSettings() {
         if (elements.enableRiskAlerts) elements.enableRiskAlerts.checked = riskAlertsEnabled;
         if (elements.riskDashboardUrl) elements.riskDashboardUrl.value = riskDashboardUrl;
         if (elements.slackWebhookUrl) elements.slackWebhookUrl.value = slackWebhookUrl;
+        if (elements.slackUseChimeMarkdown) elements.slackUseChimeMarkdown.checked = slackUseChimeMarkdown;
         if (elements.thrBc) elements.thrBc.value = thr.bc;
         if (elements.thrBcResidential) elements.thrBcResidential.value = thr.bcResidential;
         if (elements.thrCna) elements.thrCna.value = thr.cna;
@@ -191,6 +196,7 @@ async function loadGeneralSettings() {
         if (elements.thrUta) elements.thrUta.value = thr.uta;
         if (elements.thrUtl) elements.thrUtl.value = thr.utl;
         if (elements.thrRejected) elements.thrRejected.value = thr.rejected;
+        if (elements.thrRenotifyStep) elements.thrRenotifyStep.value = renotifyStep;
     } catch (error) {
         console.warn('⚠️ Failed to load general settings, using defaults');
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = 525;
@@ -201,6 +207,7 @@ async function loadGeneralSettings() {
         if (elements.enableRiskAlerts) elements.enableRiskAlerts.checked = false;
         if (elements.riskDashboardUrl) elements.riskDashboardUrl.value = '';
         if (elements.slackWebhookUrl) elements.slackWebhookUrl.value = '';
+        if (elements.slackUseChimeMarkdown) elements.slackUseChimeMarkdown.checked = false;
         if (elements.thrBc) elements.thrBc.value = 10;
         if (elements.thrBcResidential) elements.thrBcResidential.value = 5;
         if (elements.thrCna) elements.thrCna.value = 25;
@@ -209,6 +216,7 @@ async function loadGeneralSettings() {
         if (elements.thrUta) elements.thrUta.value = 5;
         if (elements.thrUtl) elements.thrUtl.value = 5;
         if (elements.thrRejected) elements.thrRejected.value = 2;
+        if (elements.thrRenotifyStep) elements.thrRenotifyStep.value = 5;
     }
 }
 
@@ -699,6 +707,9 @@ function setupEventListeners() {
         elements.slackWebhookUrl.addEventListener('change', saveGeneralSettings);
         elements.slackWebhookUrl.addEventListener('blur', saveGeneralSettings);
     }
+    if (elements.slackUseChimeMarkdown) {
+        elements.slackUseChimeMarkdown.addEventListener('change', saveGeneralSettings);
+    }
     if (elements.testRiskScan) {
         elements.testRiskScan.addEventListener('click', async () => {
             showToast('Running risk scan...', 'loading');
@@ -722,6 +733,7 @@ function setupEventListeners() {
     // Threshold listeners
     [elements.thrBc, elements.thrBcResidential, elements.thrCna, elements.thrCnaFactor, elements.thrMissing, elements.thrUta, elements.thrUtl, elements.thrRejected]
       .filter(Boolean)
+      .concat([elements.thrRenotifyStep])
       .forEach(el => {
           el.addEventListener('change', saveGeneralSettings);
           el.addEventListener('blur', saveGeneralSettings);
@@ -779,6 +791,7 @@ async function saveGeneralSettings() {
         const riskAlertsEnabled = !!elements.enableRiskAlerts?.checked;
         const riskDashboardUrl = (elements.riskDashboardUrl?.value || '').trim();
         const slackWebhookUrl = (elements.slackWebhookUrl?.value || '').trim();
+        const slackUseChimeMarkdown = !!elements.slackUseChimeMarkdown?.checked;
         const thresholds = {
             bc: parseInt(elements.thrBc?.value || '10', 10),
             bcResidential: parseInt(elements.thrBcResidential?.value || '5', 10),
@@ -789,6 +802,7 @@ async function saveGeneralSettings() {
             utl: parseInt(elements.thrUtl?.value || '5', 10),
             rejected: parseInt(elements.thrRejected?.value || '2', 10),
         };
+        const renotifyStep = parseInt(elements.thrRenotifyStep?.value || '5', 10);
 
         // Normalize URLs (strip dates, extract IDs)
         const { schedulingBaseUrl, parsedServiceAreaId } = normalizeSchedulingUrl(schedulingRaw, serviceAreaId);
@@ -804,7 +818,9 @@ async function saveGeneralSettings() {
         settings.riskAlertsEnabled = riskAlertsEnabled;
         settings.riskDashboardUrl = riskDashboardUrl;
         settings.slackWebhookUrl = slackWebhookUrl;
+        settings.slackUseChimeMarkdown = slackUseChimeMarkdown;
         settings.riskThresholds = thresholds;
+        settings.riskRenotifyStep = Number.isFinite(renotifyStep) ? renotifyStep : 5;
 
         await browser.storage.local.set({ settings });
         showToast('Saved settings', 'success');
@@ -1562,31 +1578,6 @@ async function renderUrlPreviews() {
             label.className = 'url-label';
             label.textContent = item.label;
 
-            const actions = document.createElement('div');
-            actions.className = 'url-actions';
-
-            const openBtn = document.createElement('button');
-            openBtn.className = 'btn btn-secondary btn-compact';
-            openBtn.type = 'button';
-            openBtn.textContent = 'Open';
-            openBtn.addEventListener('click', () => window.open(item.url, '_blank', 'noopener'));
-
-            const copyBtn = document.createElement('button');
-            copyBtn.className = 'btn btn-compact';
-            copyBtn.type = 'button';
-            copyBtn.textContent = 'Copy';
-            copyBtn.addEventListener('click', async () => {
-                try {
-                    await navigator.clipboard.writeText(item.url);
-                    showToast('Copied link to clipboard', 'success');
-                } catch {
-                    showToast('Copy failed', 'error');
-                }
-            });
-
-            actions.appendChild(openBtn);
-            actions.appendChild(copyBtn);
-
             const link = document.createElement('a');
             link.className = 'url-link';
             link.href = item.url;
@@ -1595,7 +1586,6 @@ async function renderUrlPreviews() {
             link.rel = 'noopener noreferrer';
 
             row.appendChild(label);
-            row.appendChild(actions);
             row.appendChild(link);
             elements.urlPreviews.appendChild(row);
         });

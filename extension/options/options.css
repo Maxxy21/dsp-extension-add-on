@@ -238,7 +238,7 @@ body {
 
 .url-preview {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     gap: 8px 12px;
     align-items: center;
     padding: 12px 14px;
@@ -271,10 +271,7 @@ body {
     padding: var(--space-4);
 }
 
-.url-actions {
-    display: inline-flex;
-    gap: 8px;
-}
+/* no action buttons */
 
 .url-preview:hover {
     border-color: var(--gray-300);
