@@ -107,10 +107,20 @@ async function handleSendSummary() {
             if (matches && matches.length > 0) {
                 targetTab = matches[0];
             } else {
-                // Open a generic Route Planning entry page
+                // Build from configured base URL, else generic
+                const { settings = {} } = await browser.storage.local.get('settings');
+                const base = settings.routePlanningBaseUrl || 'https://eu.route.planning.last-mile.a2z.com/route-planning';
+                const today = computeDateParam('other'); // today
+                let targetUrl = base;
+                try {
+                    // If base is the root, just open it; else append date /YYYY-MM-DD
+                    const u = new URL(base);
+                    if (/\/route-planning\/[A-Z0-9]+\/.+/.test(u.pathname)) {
+                        targetUrl = `${u.origin}${u.pathname}/${today}`;
+                    }
+                } catch (e) {}
                 console.log('🆕 Opening Route Planning page (fallback)...');
-                targetTab = await browser.tabs.create({ url: 'https://eu.route.planning.last-mile.a2z.com/route-planning', active: false });
-                // wait for the app shell to initialize
+                targetTab = await browser.tabs.create({ url: targetUrl, active: false });
                 await new Promise(r => setTimeout(r, 7000));
             }
         }

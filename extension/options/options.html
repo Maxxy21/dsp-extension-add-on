@@ -52,6 +52,20 @@
                                 <small>Paste the GUID from the rostering URL (serviceAreaId=...)</small>
                             </div>
                         </div>
+                        <div class="form-row" style="margin-top: 12px;">
+                            <div class="webhook-field" style="min-width: 420px;">
+                                <label for="schedulingUrl">Scheduling Page URL (base)</label>
+                                <input type="url" id="schedulingUrl" placeholder="https://logistics.amazon.co.uk/internal/scheduling/dsps?serviceAreaId=..." />
+                                <small>Paste the full scheduling link (with or without date). We will store it without the date and add the correct date automatically.</small>
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top: 12px;">
+                            <div class="webhook-field" style="min-width: 420px;">
+                                <label for="routePlanningUrl">Route Planning URL (base)</label>
+                                <input type="url" id="routePlanningUrl" placeholder="https://eu.route.planning.last-mile.a2z.com/route-planning/DHH1/7615..." />
+                                <small>Paste the Route Planning link (with or without date). We will store it without the date and add today’s date automatically.</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!-- Output Settings Card -->

@@ -65,6 +65,9 @@ function cacheElements() {
         addWebhookBtn: document.getElementById('addWebhook'),
         enableNotifications: document.getElementById('enableNotifications'),
         toast: document.getElementById('status'),
+        serviceAreaId: document.getElementById('serviceAreaId'),
+        schedulingUrl: document.getElementById('schedulingUrl'),
+        routePlanningUrl: document.getElementById('routePlanningUrl'),
         paidTimeMinutes: document.getElementById('paidTimeMinutes'),
         formatChimeManual: document.getElementById('formatChimeManual'),
         // Service type elements
@@ -149,15 +152,21 @@ async function loadGeneralSettings() {
         const paidTime = Number.isFinite(settings.paidTimeMinutes) ? settings.paidTimeMinutes : 525;
         const chimeFmt = settings.formatManualMessagesForChime !== false; // default true
         const serviceAreaId = settings.serviceAreaId || '';
+        const schedulingBaseUrl = settings.schedulingBaseUrl || '';
+        const routePlanningBaseUrl = settings.routePlanningBaseUrl || '';
 
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = paidTime;
         if (elements.formatChimeManual) elements.formatChimeManual.checked = chimeFmt;
         if (elements.serviceAreaId) elements.serviceAreaId.value = serviceAreaId;
+        if (elements.schedulingUrl) elements.schedulingUrl.value = schedulingBaseUrl;
+        if (elements.routePlanningUrl) elements.routePlanningUrl.value = routePlanningBaseUrl;
     } catch (error) {
         console.warn('⚠️ Failed to load general settings, using defaults');
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = 525;
         if (elements.formatChimeManual) elements.formatChimeManual.checked = true;
         if (elements.serviceAreaId) elements.serviceAreaId.value = '';
+        if (elements.schedulingUrl) elements.schedulingUrl.value = '';
+        if (elements.routePlanningUrl) elements.routePlanningUrl.value = '';
     }
 }
 
@@ -624,6 +633,14 @@ function setupEventListeners() {
         elements.serviceAreaId.addEventListener('change', saveGeneralSettings);
         elements.serviceAreaId.addEventListener('blur', saveGeneralSettings);
     }
+    if (elements.schedulingUrl) {
+        elements.schedulingUrl.addEventListener('change', saveGeneralSettings);
+        elements.schedulingUrl.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.routePlanningUrl) {
+        elements.routePlanningUrl.addEventListener('change', saveGeneralSettings);
+        elements.routePlanningUrl.addEventListener('blur', saveGeneralSettings);
+    }
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -664,18 +681,71 @@ async function saveGeneralSettings() {
         const paidTimeMinutes = Number.isFinite(paid) ? paid : 525;
         const formatManualMessagesForChime = !!elements.formatChimeManual?.checked;
         const serviceAreaId = (elements.serviceAreaId?.value || '').trim();
+        const schedulingRaw = (elements.schedulingUrl?.value || '').trim();
+        const routePlanningRaw = (elements.routePlanningUrl?.value || '').trim();
+
+        // Normalize URLs (strip dates, extract IDs)
+        const { schedulingBaseUrl, parsedServiceAreaId } = normalizeSchedulingUrl(schedulingRaw, serviceAreaId);
+        const { routePlanningBaseUrl } = normalizeRoutePlanningUrl(routePlanningRaw);
 
         const result = await browser.storage.local.get(['settings']);
         const settings = result.settings || {};
         settings.paidTimeMinutes = paidTimeMinutes;
         settings.formatManualMessagesForChime = formatManualMessagesForChime;
-        settings.serviceAreaId = serviceAreaId;
+        settings.serviceAreaId = parsedServiceAreaId;
+        settings.schedulingBaseUrl = schedulingBaseUrl;
+        settings.routePlanningBaseUrl = routePlanningBaseUrl;
 
         await browser.storage.local.set({ settings });
         showToast('Saved output settings', 'success');
     } catch (error) {
         console.error('❌ Error saving general settings:', error);
         showToast('Failed to save output settings', 'error');
+    }
+}
+
+// Helpers: URL normalization
+function normalizeSchedulingUrl(input, fallbackServiceAreaId) {
+    if (!input) {
+        return {
+            schedulingBaseUrl: fallbackServiceAreaId
+                ? `https://logistics.amazon.co.uk/internal/scheduling/dsps?serviceAreaId=${encodeURIComponent(fallbackServiceAreaId)}`
+                : '',
+            parsedServiceAreaId: fallbackServiceAreaId || ''
+        };
+    }
+    try {
+        const url = new URL(input);
+        const base = `${url.origin}${url.pathname}`;
+        const sa = url.searchParams.get('serviceAreaId') || fallbackServiceAreaId || '';
+        const baseParams = new URLSearchParams();
+        if (sa) baseParams.set('serviceAreaId', sa);
+        return {
+            schedulingBaseUrl: sa ? `${base}?${baseParams.toString()}` : base,
+            parsedServiceAreaId: sa
+        };
+    } catch (e) {
+        return { schedulingBaseUrl: input, parsedServiceAreaId: fallbackServiceAreaId || '' };
+    }
+}
+
+function normalizeRoutePlanningUrl(input) {
+    if (!input) return { routePlanningBaseUrl: '' };
+    try {
+        const url = new URL(input);
+        // Expect .../route-planning/<station>/<planId>/<date?>
+        const parts = url.pathname.split('/').filter(Boolean);
+        const rpIndex = parts.findIndex(p => p === 'route-planning');
+        if (rpIndex !== -1 && parts.length >= rpIndex + 3) {
+            const station = parts[rpIndex + 1];
+            const planId = parts[rpIndex + 2];
+            const basePath = `/route-planning/${station}/${planId}`;
+            return { routePlanningBaseUrl: `${url.origin}${basePath}` };
+        }
+        // Fallback: return input without trailing date-like segment
+        return { routePlanningBaseUrl: input.replace(/\/[0-9]{4}-[0-9]{2}-[0-9]{2}\/?$/, '') };
+    } catch (e) {
+        return { routePlanningBaseUrl: input.replace(/\/[0-9]{4}-[0-9]{2}-[0-9]{2}\/?$/, '') };
     }
 }
 

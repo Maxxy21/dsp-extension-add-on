@@ -271,15 +271,15 @@ async function checkDSPMismatches(serviceType, alarmName) {
         const dateStr = getServiceDateParam(serviceType);
         const { settings = {} } = await browser.storage.local.get('settings');
         const serviceAreaId = settings.serviceAreaId || '';
+        const baseConfigured = settings.schedulingBaseUrl || '';
 
-        const baseUrl = 'https://logistics.amazon.co.uk/internal/scheduling/dsps';
-        const params = new URLSearchParams();
-        if (serviceAreaId) params.set('serviceAreaId', serviceAreaId);
-        if (dateStr) params.set('date', dateStr);
-        const targetUrl = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
+        const baseUrl = baseConfigured || 'https://logistics.amazon.co.uk/internal/scheduling/dsps' + (serviceAreaId ? `?serviceAreaId=${encodeURIComponent(serviceAreaId)}` : '');
+        const urlObj = new URL(baseUrl, 'https://logistics.amazon.co.uk');
+        urlObj.searchParams.set('date', dateStr);
+        const targetUrl = urlObj.toString();
 
         // Reuse an existing rostering tab if present; otherwise open one
-        const tabs = await browser.tabs.query({ url: baseUrl + '*' });
+        const tabs = await browser.tabs.query({ url: 'https://logistics.amazon.co.uk/internal/scheduling/dsps*' });
 
         let dspTab;
         let createdNewTab = false;
