@@ -37,7 +37,6 @@ function cacheElements() {
         messageInput: document.getElementById('message'),
         charCount: document.getElementById('charCount'),
         checkNowButton: document.getElementById('checkNow'),
-        copySummaryButton: document.getElementById('copySummary'),
         sendSummaryButton: document.getElementById('sendSummary'),
         sendMessageButton: document.getElementById('sendMessage'),
         openSettingsButton: document.getElementById('openSettings'),
@@ -65,11 +64,6 @@ function setupEventListeners() {
         elements.sendMessageButton.addEventListener('click', handleSendMessage);
     }
 
-    // Copy DSP Summary button
-    if (elements.copySummaryButton) {
-        elements.copySummaryButton.addEventListener('click', handleCopySummary);
-    }
-
     // Send DSP Summary button
     if (elements.sendSummaryButton) {
         elements.sendSummaryButton.addEventListener('click', handleSendSummary);
@@ -90,57 +84,13 @@ function setupEventListeners() {
     document.addEventListener('keydown', handleGlobalKeydown);
 }
 
-async function handleCopySummary() {
-    if (isLoading) return;
-
-    const selectedDSPs = getSelectedDSPs();
-    if (selectedDSPs.length === 0) {
-        showToast('⚠️ Select DSP(s) below first', 'error');
-        return;
-    }
-
-    try {
-        setButtonLoading(elements.copySummaryButton, true);
-        showToast('Generating DSP summary...', 'loading');
-
-        // Get active tab
-        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-        if (!tabs || tabs.length === 0) {
-            throw new Error('No active tab found');
-        }
-
-        const tab = tabs[0];
-        const response = await browser.tabs.sendMessage(tab.id, {
-            action: 'getDSPSummary',
-            dsps: selectedDSPs
-        });
-
-        if (!response?.success) {
-            throw new Error(response?.error || 'Failed to generate summary');
-        }
-
-        const text = response.text || '';
-        if (!text) {
-            showToast('No matching rows found on page', 'error');
-            return;
-        }
-
-        await navigator.clipboard.writeText(text);
-        showToast('✅ DSP summary copied to clipboard', 'success');
-    } catch (error) {
-        console.error('Copy summary failed:', error);
-        showToast(`❌ ${error.message}`, 'error');
-    } finally {
-        setButtonLoading(elements.copySummaryButton, false);
-    }
-}
-
 async function handleSendSummary() {
     if (isLoading) return;
 
-    const selectedDSPs = getSelectedDSPs();
+    // Always send to all configured DSPs
+    const selectedDSPs = Object.keys(availableDSPs || {});
     if (selectedDSPs.length === 0) {
-        showToast('⚠️ Select DSP(s) below first', 'error');
+        showToast('⚠️ No DSP webhooks configured in Settings', 'error');
         return;
     }
 
@@ -187,8 +137,9 @@ async function handleSendSummary() {
             }
 
             const { avgShift, avgSpr } = item;
-            // Build Chime Markdown message consistent with other alerts
-            const message = `/md #### 📊 DSP Summary: ${dsp} (Standard Parcel Only)\n\n` +
+            // Build Chime Markdown message with intro line
+            const message = `/md Moin,\n\nanbei die heutigen SPR, Shift Time und Paid Time Minutes.\n\n` +
+                `#### 📊 DSP Summary: ${dsp} (Standard Parcel Only)\n\n` +
                 `| DSP | Shift Time Minutes | Avg. of SPR | Paid Time Minutes |\n` +
                 `|---|---:|---:|---:|\n` +
                 `| ${dsp} | ${avgShift} | ${avgSpr} | ${paidTime} |\n` +

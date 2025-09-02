@@ -278,6 +278,14 @@ body {
     padding: var(--space-6);
 }
 
+/* Button row spacing */
+.actions-row {
+    display: flex;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
 /* Form elements */
 .form-group {
     margin-bottom: var(--space-4);

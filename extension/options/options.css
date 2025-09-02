@@ -360,7 +360,8 @@ input[type="checkbox"]:focus + .switch {
 }
 
 .webhook-field input[type="text"],
-.webhook-field input[type="url"] {
+.webhook-field input[type="url"],
+.webhook-field input[type="number"] {
     width: 100%;
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
@@ -850,7 +851,8 @@ input[type="checkbox"]:focus + .switch {
     }
     
     .webhook-field input[type="text"],
-    .webhook-field input[type="url"] {
+    .webhook-field input[type="url"],
+    .webhook-field input[type="number"] {
         background: var(--surface);
         color: var(--text-primary);
     }
