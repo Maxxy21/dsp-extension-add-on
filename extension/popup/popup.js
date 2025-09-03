@@ -138,6 +138,10 @@ async function handleSendSummary() {
         const { items = {}, paidTime } = response;
         let success = 0; let failed = 0;
 
+        // Compute today's date string for message context (European format DD.MM.YYYY)
+        const _now = new Date();
+        const todayStr = `${String(_now.getDate()).padStart(2, '0')}.${String(_now.getMonth() + 1).padStart(2, '0')}.${_now.getFullYear()}`;
+
         for (const dsp of selectedDSPs) {
             const item = items[dsp];
             if (!item) {
@@ -147,13 +151,14 @@ async function handleSendSummary() {
             }
 
             const { avgShift, avgSpr } = item;
-            // Build Chime Markdown message with intro line
-            const message = `/md Moin,\n\nanbei die heutigen SPR, Shift Time und Paid Time Minutes.\n\n` +
-                `#### 📊 DSP Summary: ${dsp} (Standard Parcel Only)\n\n` +
-                `| DSP | Shift Time Minutes | Avg. of SPR | Paid Time Minutes |\n` +
-                `|---|---:|---:|---:|\n` +
-                `| ${dsp} | ${avgShift} | ${avgSpr} | ${paidTime} |\n` +
-                `| Grand Total | ${avgShift} | ${avgSpr} | ${paidTime} |`;
+            // Build Chime Markdown message as a simple list (no table, no grand total)
+            const message = `/md Moin,\n\n` +
+                `anbei die heutigen Standard Parcel SPR, Shift Time und Paid Time Minutes.\n\n` +
+                `Datum: ${todayStr}\n\n` +
+                `• DSP: ${dsp}\n` +
+                `• Shift Time Minutes: ${avgShift}\n` +
+                `• Avg SPR: ${avgSpr}\n` +
+                `• Paid Time Minutes: ${paidTime}`;
 
             const result = await browser.runtime.sendMessage({
                 action: 'sendMessage',
