@@ -87,6 +87,7 @@ function cacheElements() {
         thrUtl: document.getElementById('thrUtl'),
         thrRejected: document.getElementById('thrRejected'),
         thrRenotifyStep: document.getElementById('thrRenotifyStep'),
+        inferPaidTime: document.getElementById('inferPaidTime'),
         // Failed reattempts
         failedBackbriefUrl: document.getElementById('failedBackbriefUrl'),
         failedChunkSize: document.getElementById('failedChunkSize'),
@@ -110,7 +111,11 @@ function cacheElements() {
         batchTextInput: document.getElementById('batchTextInput'),
         showTextInputBtn: document.getElementById('showTextInput'),
         processBatchBtn: document.getElementById('processBatch'),
-        cancelBatchBtn: document.getElementById('cancelBatch')
+        cancelBatchBtn: document.getElementById('cancelBatch'),
+        // Manifest upload
+        manifestUpload: document.getElementById('manifestUpload'),
+        manifestStatus: document.getElementById('manifestStatus'),
+        clearManifestMap: document.getElementById('clearManifestMap')
     };
 
     // Validate required elements
@@ -162,6 +167,10 @@ async function loadSettings() {
 
         // Load webhooks
         await loadWebhooks();
+        // Load uploaded manifest status
+        await loadUploadedManifestStatus();
+        // Load uploaded backbrief status
+        await loadUploadedBackbriefStatus();
 
         // Load alarm status if notifications are enabled
         if (notificationsEnabled) {
@@ -209,6 +218,7 @@ async function loadGeneralSettings() {
         if (elements.thrUtl) elements.thrUtl.value = thr.utl;
         if (elements.thrRejected) elements.thrRejected.value = thr.rejected;
         if (elements.thrRenotifyStep) elements.thrRenotifyStep.value = renotifyStep;
+        if (elements.inferPaidTime) elements.inferPaidTime.checked = settings.paidTimeInferFromConstraints === true;
 
         // Failed reattempts
         const failedReasons = settings.failedReasons || [
@@ -241,6 +251,7 @@ async function loadGeneralSettings() {
         if (elements.thrUtl) elements.thrUtl.value = 5;
         if (elements.thrRejected) elements.thrRejected.value = 2;
         if (elements.thrRenotifyStep) elements.thrRenotifyStep.value = 5;
+        if (elements.inferPaidTime) elements.inferPaidTime.checked = false;
         // Failed reattempts defaults
         if (elements.failedBackbriefUrl) elements.failedBackbriefUrl.value = '';
         if (elements.failedChunkSize) elements.failedChunkSize.value = 20;
@@ -742,6 +753,9 @@ function setupEventListeners() {
     if (elements.slackUseChimeMarkdown) {
         elements.slackUseChimeMarkdown.addEventListener('change', saveGeneralSettings);
     }
+    if (elements.inferPaidTime) {
+        elements.inferPaidTime.addEventListener('change', saveGeneralSettings);
+    }
     // Failed reattempts listeners
     if (elements.failedAutoEnabled) {
         elements.failedAutoEnabled.addEventListener('change', async () => {
@@ -799,6 +813,31 @@ function setupEventListeners() {
             }
         });
     }
+    // Manifest upload listeners
+    if (elements.manifestUpload) {
+        elements.manifestUpload.addEventListener('change', handleManifestUpload);
+    }
+    if (elements.clearManifestMap) {
+        elements.clearManifestMap.addEventListener('click', async () => {
+            await browser.storage.local.remove('uploadedManifestMap');
+            updateManifestStatus(null);
+            showToast('Cleared uploaded manifest', 'success');
+        });
+    }
+    // Backbrief upload listeners
+    elements.backbriefUpload = document.getElementById('backbriefUpload');
+    elements.backbriefStatus = document.getElementById('backbriefStatus');
+    elements.clearBackbriefData = document.getElementById('clearBackbriefData');
+    if (elements.backbriefUpload) {
+        elements.backbriefUpload.addEventListener('change', handleBackbriefUpload);
+    }
+    if (elements.clearBackbriefData) {
+        elements.clearBackbriefData.addEventListener('click', async () => {
+            await browser.storage.local.remove('uploadedBackbriefRows');
+            updateBackbriefStatus(null);
+            showToast('Cleared uploaded backbrief', 'success');
+        });
+    }
     // Threshold listeners
     [elements.thrBc, elements.thrBcResidential, elements.thrCna, elements.thrCnaFactor, elements.thrMissing, elements.thrUta, elements.thrUtl, elements.thrRejected]
       .filter(Boolean)
@@ -849,6 +888,214 @@ function setupEventListeners() {
     console.log('✅ Event listeners set up successfully');
 }
 
+async function loadUploadedManifestStatus() {
+    try {
+        const { uploadedManifestMap } = await browser.storage.local.get('uploadedManifestMap');
+        updateManifestStatus(uploadedManifestMap);
+    } catch (e) {
+        console.warn('Failed to load manifest status');
+    }
+}
+
+async function loadUploadedBackbriefStatus() {
+    try {
+        const { uploadedBackbriefRows } = await browser.storage.local.get('uploadedBackbriefRows');
+        updateBackbriefStatus(uploadedBackbriefRows);
+    } catch (e) {
+        console.warn('Failed to load backbrief status');
+    }
+}
+
+function updateManifestStatus(state) {
+    if (!elements.manifestStatus) return;
+    // Clear existing
+    while (elements.manifestStatus.firstChild) {
+        elements.manifestStatus.removeChild(elements.manifestStatus.firstChild);
+    }
+    if (!state || !state.count) {
+        const span = document.createElement('span');
+        span.textContent = 'No manifest uploaded';
+        elements.manifestStatus.appendChild(span);
+        return;
+    }
+    const strong = document.createElement('strong');
+    strong.textContent = String(state.count);
+    const text1 = document.createTextNode(' rows • ');
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = state.date || 'Unknown date';
+    elements.manifestStatus.appendChild(strong);
+    elements.manifestStatus.appendChild(text1);
+    elements.manifestStatus.appendChild(dateSpan);
+}
+
+function updateBackbriefStatus(state) {
+    const el = elements.backbriefStatus;
+    if (!el) return;
+    while (el.firstChild) el.removeChild(el.firstChild);
+    if (!state || !state.count) {
+        const span = document.createElement('span');
+        span.textContent = 'No backbrief uploaded';
+        el.appendChild(span);
+        return;
+    }
+    const strong = document.createElement('strong');
+    strong.textContent = String(state.count);
+    const text1 = document.createTextNode(' rows • ');
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = state.date || 'Unknown date';
+    el.appendChild(strong);
+    el.appendChild(text1);
+    el.appendChild(dateSpan);
+}
+
+async function handleManifestUpload(evt) {
+    try {
+        const file = evt.target.files && evt.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const parsed = parseManifestCsv(text);
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const state = { date: `${yyyy}-${mm}-${dd}`, count: Object.keys(parsed).length, map: parsed };
+        await browser.storage.local.set({ uploadedManifestMap: state });
+        updateManifestStatus(state);
+        showToast(`Uploaded ${state.count} manifest rows`, 'success');
+    } catch (e) {
+        console.error('Manifest upload failed:', e);
+        showToast('Failed to process manifest CSV', 'error');
+    } finally {
+        if (elements.manifestUpload) elements.manifestUpload.value = '';
+    }
+}
+
+function parseManifestCsv(text) {
+    // Simple CSV parser
+    const rows = [];
+    let i = 0, field = '', inQuotes = false, row = [];
+    const pushField = () => { row.push(field); field = ''; };
+    const pushRow = () => { if (row.length) rows.push(row); row = []; };
+    while (i < text.length) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (text[i+1] === '"') { field += '"'; i++; }
+                else inQuotes = false;
+            } else field += ch;
+        } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ',') pushField();
+            else if (ch === '\n') { pushField(); pushRow(); }
+            else if (ch === '\r') {}
+            else field += ch;
+        }
+        i++;
+    }
+    if (field.length || row.length) { pushField(); pushRow(); }
+    if (rows.length === 0) return {};
+    const header = rows[0].map(h => normalizeKey(h));
+    const idx = {};
+    header.forEach((h, i) => { idx[h] = i; });
+    const pick = (r, keys) => {
+        for (const k of keys) {
+            const i = idx[k];
+            if (i != null && r[i] != null) return (r[i] || '').trim();
+        }
+        return '';
+    };
+    const out = {};
+    for (let r = 1; r < rows.length; r++) {
+        const cols = rows[r];
+        const trackingId = (pick(cols, ['tracking_id','trackingid','tracking','tid','id']) || '').toUpperCase();
+        if (!trackingId) continue;
+        const address = pick(cols, ['actual_customer_address','customer_address','address']);
+        let timeWindow = pick(cols, ['time_window','timewindow','tw']);
+        if (!timeWindow) {
+            const st = pick(cols, ['start_time','start']);
+            const et = pick(cols, ['end_time','end']);
+            if (st || et) timeWindow = `${st || ''} - ${et || ''}`.trim();
+        }
+        if (address || timeWindow) out[trackingId] = { address, timeWindow: timeWindow || 'No Time Window' };
+    }
+    return out;
+}
+
+function normalizeKey(h) {
+    return String(h || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+async function handleBackbriefUpload(evt) {
+    try {
+        const file = evt.target.files && evt.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        const rows = parseBackbriefCsv(text);
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const state = { date: `${yyyy}-${mm}-${dd}`, count: rows.length, rows };
+        await browser.storage.local.set({ uploadedBackbriefRows: state });
+        updateBackbriefStatus(state);
+        showToast(`Uploaded ${state.count} backbrief rows`, 'success');
+    } catch (e) {
+        console.error('Backbrief upload failed:', e);
+        showToast('Failed to process backbrief CSV', 'error');
+    } finally {
+        if (elements.backbriefUpload) elements.backbriefUpload.value = '';
+    }
+}
+
+function parseBackbriefCsv(text) {
+    // Lightweight CSV parser
+    const rows = [];
+    let i = 0, field = '', inQuotes = false, row = [];
+    const pushField = () => { row.push(field); field = ''; };
+    const pushRow = () => { if (row.length) rows.push(row); row = []; };
+    while (i < text.length) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"') { if (text[i+1] === '"') { field += '"'; i++; } else inQuotes = false; }
+            else field += ch;
+        } else {
+            if (ch === '"') inQuotes = true;
+            else if (ch === ',') pushField();
+            else if (ch === '\n') { pushField(); pushRow(); }
+            else if (ch === '\r') {}
+            else field += ch;
+        }
+        i++;
+    }
+    if (field.length || row.length) { pushField(); pushRow(); }
+    if (rows.length === 0) return [];
+    const header = rows[0].map(h => normalizeKey(h));
+    const idx = {};
+    header.forEach((h, i) => { idx[h] = i; });
+    const pick = (r, keys) => {
+        for (const k of keys) {
+            const i = idx[k];
+            if (i != null && r[i] != null) return (r[i] || '').trim();
+        }
+        return '';
+    };
+    const out = [];
+    for (let r = 1; r < rows.length; r++) {
+        const cols = rows[r];
+        const trackingId = (pick(cols, ['tracking_id','trackingid','tracking','tid','id']) || '').toUpperCase();
+        if (!trackingId) continue;
+        const deliveryStation = pick(cols, ['delivery_station','ds','station']);
+        const route = pick(cols, ['route','route_id','manifestroutecode']);
+        const dspName = (pick(cols, ['dsp_name','dsp','latestdspname','compdadata_latestdspname']) || '').toUpperCase();
+        const reason = pick(cols, ['reason','internal_reason_code']);
+        const attemptReason = pick(cols, ['attempt_reason','compattemptdata_complatestattemptevent_internalreasoncode']);
+        const latestAttempt = pick(cols, ['latest_attempt','attempt_time','compattemptdata_complatestattemptevent_timestamp']);
+        const addressType = pick(cols, ['address_type']);
+        out.push({ trackingId, deliveryStation, route, dspName, reason, attemptReason, latestAttempt, addressType });
+    }
+    return out;
+}
+
 async function saveGeneralSettings() {
     try {
         const paid = parseInt(elements.paidTimeMinutes?.value || '525', 10);
@@ -881,6 +1128,7 @@ async function saveGeneralSettings() {
             rejected: pInt(elements.thrRejected?.value, 2),
         };
         const renotifyStep = pInt(elements.thrRenotifyStep?.value, 5);
+        const paidTimeInferFromConstraints = !!elements.inferPaidTime?.checked;
 
         // Failed reattempts settings
         const failedBackbriefUrl = (elements.failedBackbriefUrl?.value || '').trim();
@@ -913,6 +1161,7 @@ async function saveGeneralSettings() {
         settings.slackUseChimeMarkdown = slackUseChimeMarkdown;
         settings.riskThresholds = thresholds;
         settings.riskRenotifyStep = Number.isFinite(renotifyStep) ? renotifyStep : 5;
+        settings.paidTimeInferFromConstraints = paidTimeInferFromConstraints;
         // Failed reattempts
         settings.failedBackbriefUrl = failedBackbriefUrl;
         settings.failedChunkSize = failedChunkSize;

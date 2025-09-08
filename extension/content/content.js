@@ -628,7 +628,9 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
         try {
             const dspList = Array.isArray(request.dsps) ? request.dsps : [];
             const { settings = {} } = await browser.storage.local.get('settings');
-            const paidTime = Number.isFinite(settings.paidTimeMinutes) ? settings.paidTimeMinutes : CONFIG.SUMMARY.PAID_TIME_MINUTES;
+            const paidTime = Number.isFinite(request.overridePaidTime)
+                ? request.overridePaidTime
+                : (Number.isFinite(settings.paidTimeMinutes) ? settings.paidTimeMinutes : CONFIG.SUMMARY.PAID_TIME_MINUTES);
             const { items, text } = extractAndFormatDSPSummariesFromRoutePlanning(dspList, paidTime);
             return Promise.resolve({ success: true, text, items, paidTime });
         } catch (error) {
@@ -694,7 +696,38 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
             return Promise.resolve({ success: false, error: error.message, map: {} });
         }
     }
-    
+
+    // Extract mapping from Route Sheets page as fallback (Tracking ID -> { address?, timeWindow })
+    if (request.action === 'getSheetsTrackingMap') {
+        try {
+            if (!/\.dispatch\.planning\.last-mile\.a2z\.com/.test(location.hostname)) {
+                throw new Error('Not on Route Sheets page');
+            }
+            const map = extractSheetsTrackingMapFromPage();
+            return Promise.resolve({ success: true, map, url: location.href });
+        } catch (error) {
+            console.error('Sheets extraction failed:', error);
+            return Promise.resolve({ success: false, error: error.message, map: {} });
+        }
+    }
+
+    // Infer Paid Time from Route Constraints page (In Shift Length (mins))
+    if (request.action === 'getPaidTimeFromConstraints') {
+        try {
+            if (!/\.dispatch\.planning\.last-mile\.a2z\.com/.test(location.hostname)) {
+                throw new Error('Not on Route Constraints page');
+            }
+            const minutes = extractPaidTimeFromConstraints();
+            if (Number.isFinite(minutes) && minutes > 0) {
+                return Promise.resolve({ success: true, minutes });
+            }
+            return Promise.resolve({ success: false, error: 'Could not infer a consistent value' });
+        } catch (error) {
+            console.error('Paid time inference failed:', error);
+            return Promise.resolve({ success: false, error: error.message });
+        }
+    }
+
     return Promise.resolve({ success: true });
 });
 
@@ -964,6 +997,43 @@ function extractBackbriefFromPage(includeReasons = [], mapUnableToAccess = true)
     return results;
 }
 
+function extractPaidTimeFromConstraints() {
+    const tables = Array.from(document.querySelectorAll('table'));
+    const headerMatch = (t) => /shift\s*length/i.test(t) || /in\s*shift/i.test(t);
+    for (const table of tables) {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        if (rows.length < 2) continue;
+        // find header row
+        let headerRow = null;
+        for (const tr of rows.slice(0, 5)) {
+            const cells = Array.from(tr.querySelectorAll('th,td')).map(c => (c.innerText || '').trim());
+            if (cells.length < 3) continue;
+            if (cells.some(headerMatch)) { headerRow = tr; break; }
+        }
+        if (!headerRow) continue;
+        const headers = Array.from(headerRow.querySelectorAll('th,td')).map(c => (c.innerText || '').trim().toLowerCase());
+        const colIndex = headers.findIndex(h => /shift\s*length/.test(h));
+        const minutes = [];
+        for (const tr of rows.slice(rows.indexOf(headerRow) + 1)) {
+            const tds = Array.from(tr.querySelectorAll('td'));
+            if (tds.length === 0) continue;
+            let val = '';
+            if (colIndex >= 0 && tds[colIndex]) val = (tds[colIndex].innerText || '').trim();
+            else {
+                // Try to guess column by finding a pure integer cell commonly used
+                const candidate = Array.from(tds).map(td => (td.innerText || '').trim()).find(x => /^\d{2,4}$/.test(x));
+                val = candidate || '';
+            }
+            const n = parseInt((val || '').replace(/[^\d-]/g, ''), 10);
+            if (Number.isFinite(n)) minutes.push(n);
+        }
+        if (minutes.length > 0 && minutes.every(m => m === minutes[0])) {
+            return minutes[0];
+        }
+    }
+    return 0;
+}
+
 async function tryCaptureBackbriefCsv() {
     // Heuristic: look for anchors likely pointing to CSV (blob: or data:) anywhere in the document
     const anchors = Array.from(document.querySelectorAll('a'));
@@ -1049,6 +1119,54 @@ function extractManifestTrackingMapFromPage() {
                     address,
                     timeWindow: hasTimeWindow ? (timeWindow || 'No Time Window') : 'No Time Window'
                 };
+            }
+        }
+    }
+    return out;
+}
+
+function extractSheetsTrackingMapFromPage() {
+    const tables = Array.from(document.querySelectorAll('table'));
+    const expectedHeaders = {
+        trackingId: ['tracking id', 'tid', 'id'],
+        address: ['address', 'customer address', 'actual customer address'],
+        timeWindow: ['time window', 'tw']
+    };
+    const out = {};
+    for (const table of tables) {
+        const rows = Array.from(table.querySelectorAll('tr'));
+        if (rows.length < 2) continue;
+        let headerRow = null;
+        for (const tr of rows.slice(0, 5)) {
+            const cells = Array.from(tr.querySelectorAll('th,td')).map(c => (c.innerText || '').trim());
+            if (cells.length < 3) continue;
+            const hasTid = cells.some(c => headerMatches(c, expectedHeaders.trackingId));
+            const hasTW = cells.some(c => headerMatches(c, expectedHeaders.timeWindow));
+            if (hasTid && hasTW) { headerRow = tr; break; }
+        }
+        if (!headerRow) continue;
+
+        const headers = Array.from(headerRow.querySelectorAll('th,td')).map(c => (c.innerText || '').trim());
+        const idx = {};
+        headers.forEach((h, i) => {
+            Object.entries(expectedHeaders).forEach(([key, pats]) => {
+                if (idx[key] == null && headerMatches(h, pats)) idx[key] = i;
+            });
+        });
+
+        for (const tr of rows.slice(rows.indexOf(headerRow) + 1)) {
+            const tds = Array.from(tr.querySelectorAll('td'));
+            if (tds.length < 3) continue;
+            const val = (k) => {
+                const i = idx[k];
+                return i != null && tds[i] ? (tds[i].innerText || '').trim() : '';
+            };
+            const tid = (val('trackingId') || '').toUpperCase();
+            if (!tid) continue;
+            const address = val('address');
+            const timeWindow = val('timeWindow');
+            if (timeWindow) {
+                out[tid] = { address, timeWindow };
             }
         }
     }

@@ -252,6 +252,62 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Manifest Upload Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-content">
+                            <h2>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Manifest Upload (CSV)
+                            </h2>
+                            <p class="card-description">Upload a Plan Manifest CSV to enrich Address and Time Window reliably</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="form-row" style="align-items: center; gap: 16px;">
+                            <div class="webhook-field" style="min-width: 380px;">
+                                <label for="manifestUpload">Upload Plan Manifest (.csv)</label>
+                                <input type="file" id="manifestUpload" accept=".csv,text/csv" />
+                                <small>Expected headers include Tracking ID and either Time Window or Start/End Time. You can export XLS/XLSX as CSV and upload it.</small>
+                            </div>
+                            <div id="manifestStatus" class="info-content" style="min-width: 220px;">
+                                <span>No manifest uploaded</span>
+                            </div>
+                            <button id="clearManifestMap" class="btn btn-secondary" type="button">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backbrief Upload Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-content">
+                            <h2>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Backbrief Upload (CSV)
+                            </h2>
+                            <p class="card-description">Upload Backbrief CSV to drive the reattempts notification without scraping</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="form-row" style="align-items: center; gap: 16px;">
+                            <div class="webhook-field" style="min-width: 380px;">
+                                <label for="backbriefUpload">Upload Backbrief (.csv)</label>
+                                <input type="file" id="backbriefUpload" accept=".csv,text/csv" />
+                                <small>Expected columns: Tracking ID, Route, DSP Name, Reason/Attempt Reason, Latest Attempt, Address Type</small>
+                            </div>
+                            <div id="backbriefStatus" class="info-content" style="min-width: 220px;">
+                                <span>No backbrief uploaded</span>
+                            </div>
+                            <button id="clearBackbriefData" class="btn btn-secondary" type="button">Clear</button>
+                        </div>
+                    </div>
+                </div>
                 <!-- Output Settings Card -->
                 <div class="card">
                     <div class="card-header">
@@ -272,6 +328,16 @@
                                 <label for="paidTimeMinutes">Paid Time Minutes</label>
                                 <input type="number" id="paidTimeMinutes" min="0" step="1" placeholder="525" />
                                 <small>Used when generating DSP summaries</small>
+                            </div>
+                        </div>
+                        <div class="toggle-setting" style="margin-top: 8px;">
+                            <div class="toggle-info">
+                                <label class="toggle-label" for="inferPaidTime">Infer from Route Constraints</label>
+                                <p class="toggle-description">Read “In Shift Length (mins)” from the Constraints page when available. Falls back to manual value if inconsistent.</p>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="inferPaidTime">
+                                <label for="inferPaidTime" class="switch"></label>
                             </div>
                         </div>
                         <div class="toggle-setting" style="margin-top: 8px;">

@@ -164,10 +164,48 @@ async function handleSendSummary() {
             }
         }
 
+        // Optionally infer Paid Time from Constraints page
+        let overridePaidTime = null;
+        try {
+            const { settings = {} } = await browser.storage.local.get('settings');
+            if (settings.paidTimeInferFromConstraints === true) {
+                // Build constraints URL from routePlanningBaseUrl
+                const base = settings.routePlanningBaseUrl || '';
+                if (base) {
+                    let constraintsUrl = base.replace('://eu.route.planning.last-mile.a2z.com/route-planning', '://eu.dispatch.planning.last-mile.a2z.com/route-constraints');
+                    try {
+                        const u = new URL(constraintsUrl);
+                        const today = computeDateParam('other');
+                        if (!/\d{4}-\d{2}-\d{2}$/.test(u.pathname)) {
+                            constraintsUrl = `${u.origin}${u.pathname}/${today}`;
+                        }
+                    } catch {}
+                    let ctab;
+                    const matchesC = await browser.tabs.query({ url: '*://eu.dispatch.planning.last-mile.a2z.com/route-constraints/*' });
+                    if (matchesC && matchesC.length > 0) {
+                        ctab = matchesC[0];
+                        await browser.tabs.update(ctab.id, { url: constraintsUrl, active: false });
+                    } else {
+                        ctab = await browser.tabs.create({ url: constraintsUrl, active: false });
+                    }
+                    await new Promise(r => setTimeout(r, 6000));
+                    try {
+                        const resPT = await browser.tabs.sendMessage(ctab.id, { action: 'getPaidTimeFromConstraints' });
+                        if (resPT?.success && Number.isFinite(resPT.minutes) && resPT.minutes > 0) {
+                            overridePaidTime = resPT.minutes;
+                        }
+                    } catch (e) {
+                        console.warn('Paid time inference messaging failed:', e);
+                    }
+                }
+            }
+        } catch (e) { console.warn('Paid time inference skipped:', e); }
+
         // Ask content script for per-DSP summary values
         const response = await browser.tabs.sendMessage(targetTab.id, {
             action: 'getDSPSummary',
-            dsps: selectedDSPs
+            dsps: selectedDSPs,
+            overridePaidTime: overridePaidTime
         });
 
         if (!response?.success) {

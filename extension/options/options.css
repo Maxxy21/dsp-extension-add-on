@@ -168,7 +168,7 @@ body {
 
 .settings-grid {
     display: grid;
-    gap: var(--space-8);
+    gap: var(--space-10);
 }
 
 /* Cards */
@@ -179,12 +179,19 @@ body {
     box-shadow: var(--shadow-sm);
     transition: var(--transition);
     overflow: hidden;
+    /* Provide extra separation for environments not honoring grid gap consistently */
+    margin-bottom: var(--space-6);
 }
 
 .card:hover {
     box-shadow: var(--shadow-lg);
     border-color: var(--gray-300);
     transform: translateY(-2px);
+}
+
+/* Avoid double bottom spacing on the last card */
+.settings-grid > .card:last-child {
+    margin-bottom: 0;
 }
 
 .card-header {

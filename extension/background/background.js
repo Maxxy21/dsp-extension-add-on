@@ -1019,57 +1019,63 @@ async function runFailedReattemptReport() {
         return { sent: 0, dspsNotified: 0, error: 'Backbrief dashboard URL not configured' };
     }
 
-    // Open or reuse dashboard tab
-    const matches = await browser.tabs.query({ url: backbriefUrl.split('#')[0] + '*' });
-    let tab;
-    if (matches && matches.length > 0) {
-        tab = matches[0];
-        await browser.tabs.update(tab.id, { url: backbriefUrl, active: false });
-    } else {
-        tab = await browser.tabs.create({ url: backbriefUrl, active: false });
-    }
-
-    await new Promise(r => setTimeout(r, 8000));
-
-    // Prefer CSV capture; fall back to DOM extraction
+    // First, prefer uploaded backbrief if present
     let rows = [];
     try {
-        const csvResp = await browser.tabs.sendMessage(tab.id, { action: 'getBackbriefCsv' });
-        if (csvResp?.success && csvResp.csv) {
-            const parsed = parseBackbriefCsv(csvResp.csv);
-            rows = parsed.filter(r => {
-                if (!r.trackingId) return false;
-                if (Array.isArray(includeReasons) && includeReasons.length) {
-                    const reason = r.reason || '';
-                    const attemptReason = r.attemptReason || '';
-                    const mappedReason = attemptReason === 'UNABLE_TO_ACCESS' ? 'UNABLE_TO_ACCESS' : reason;
-                    return includeReasons.includes(mappedReason);
-                }
-                return true;
-            }).map(r => ({
-                trackingId: (r.trackingId || '').toUpperCase(),
-                deliveryStation: r.deliveryStation || r.ds || '',
-                route: r.route || r.manifestRouteCode || '',
-                dspName: (r.dspName || r.latestDSPName || '').toUpperCase(),
-                reason: r.attemptReason === 'UNABLE_TO_ACCESS' ? 'UNABLE_TO_ACCESS' : (r.reason || ''),
-                attemptReason: r.attemptReason || '',
-                latestAttempt: r.latestAttempt || r.attemptTime || '',
-                addressType: r.addressType || ''
-            }));
+        const { uploadedBackbriefRows } = await browser.storage.local.get('uploadedBackbriefRows');
+        if (uploadedBackbriefRows && Array.isArray(uploadedBackbriefRows.rows) && uploadedBackbriefRows.rows.length) {
+            rows = uploadedBackbriefRows.rows;
         }
-    } catch (e) {
-        console.warn('CSV parse path failed, will fallback:', e);
-    }
+    } catch {}
 
     if (!rows.length) {
-        let response;
-        try {
-            response = await browser.tabs.sendMessage(tab.id, { action: 'getBackbriefFailedShipments', includeReasons, mapUnableToAccess: true });
-        } catch (e) {
-            return { sent: 0, dspsNotified: 0, error: 'Content script not ready on Backbrief page' };
+        // Open or reuse dashboard tab and capture live
+        const matches = await browser.tabs.query({ url: backbriefUrl.split('#')[0] + '*' });
+        let tab;
+        if (matches && matches.length > 0) {
+            tab = matches[0];
+            await browser.tabs.update(tab.id, { url: backbriefUrl, active: false });
+        } else {
+            tab = await browser.tabs.create({ url: backbriefUrl, active: false });
         }
-        rows = Array.isArray(response?.rows) ? response.rows : [];
+        await new Promise(r => setTimeout(r, 8000));
+
+        // Prefer CSV capture; fall back to DOM extraction
+        try {
+            const csvResp = await browser.tabs.sendMessage(tab.id, { action: 'getBackbriefCsv' });
+            if (csvResp?.success && csvResp.csv) {
+                const parsed = parseBackbriefCsv(csvResp.csv);
+                rows = parsed;
+            }
+        } catch (e) {
+            console.warn('CSV parse path failed, will fallback:', e);
+        }
+        if (!rows.length) {
+            try {
+                const response = await browser.tabs.sendMessage(tab.id, { action: 'getBackbriefFailedShipments', includeReasons, mapUnableToAccess: true });
+                rows = Array.isArray(response?.rows) ? response.rows : [];
+            } catch (e) {
+                return { sent: 0, dspsNotified: 0, error: 'Content script not ready on Backbrief page' };
+            }
+        }
     }
+
+    // Normalize/filter rows once
+    rows = rows.filter(r => r && r.trackingId).map(r => ({
+        trackingId: (r.trackingId || '').toUpperCase(),
+        deliveryStation: r.deliveryStation || r.ds || '',
+        route: r.route || r.manifestRouteCode || '',
+        dspName: (r.dspName || r.latestDSPName || '').toUpperCase(),
+        reason: (r.attemptReason === 'UNABLE_TO_ACCESS') ? 'UNABLE_TO_ACCESS' : (r.reason || ''),
+        attemptReason: r.attemptReason || '',
+        latestAttempt: r.latestAttempt || r.attemptTime || '',
+        addressType: r.addressType || ''
+    })).filter(r => {
+        if (Array.isArray(includeReasons) && includeReasons.length) {
+            return includeReasons.includes(r.reason);
+        }
+        return true;
+    });
     if (rows.length === 0) return { sent: 0, dspsNotified: 0 };
 
     // Try to enrich with manifest address and time window if route planning URL configured
@@ -1101,10 +1107,35 @@ async function runFailedReattemptReport() {
             await new Promise(r => setTimeout(r, 7000));
             const manResp = await browser.tabs.sendMessage(tabRP.id, { action: 'getManifestTrackingMap' });
             if (manResp?.success && manResp.map) manifestMap = manResp.map;
+            // If manifest map is empty, try route-sheets fallback
+            if (!manifestMap || Object.keys(manifestMap).length === 0) {
+                try {
+                    let sheetsUrl = rtpUrl.replace('://eu.route.planning.last-mile.a2z.com/route-planning', '://eu.dispatch.planning.last-mile.a2z.com/route-sheets');
+                    const matchesRS = await browser.tabs.query({ url: sheetsUrl.split('#')[0] + '*' });
+                    let tabRS;
+                    if (matchesRS && matchesRS.length > 0) {
+                        tabRS = matchesRS[0];
+                        await browser.tabs.update(tabRS.id, { url: sheetsUrl, active: false });
+                    } else {
+                        tabRS = await browser.tabs.create({ url: sheetsUrl, active: false });
+                    }
+                    await new Promise(r => setTimeout(r, 7000));
+                    const rsResp = await browser.tabs.sendMessage(tabRS.id, { action: 'getSheetsTrackingMap' });
+                    if (rsResp?.success && rsResp.map) manifestMap = rsResp.map;
+                } catch (e) { console.warn('Route sheets enrichment failed:', e); }
+            }
         } catch (e) {
             console.warn('Manifest enrichment skipped:', e);
         }
     }
+
+    // Overlay uploaded manifest map if present
+    try {
+        const { uploadedManifestMap } = await browser.storage.local.get('uploadedManifestMap');
+        if (uploadedManifestMap && uploadedManifestMap.map && Object.keys(uploadedManifestMap.map).length) {
+            manifestMap = { ...manifestMap, ...uploadedManifestMap.map };
+        }
+    } catch {}
 
     // Group by DSP
     const byDSP = new Map();
@@ -1146,7 +1177,21 @@ async function runFailedReattemptReport() {
                 const mm = manifestMap[tracking] || {};
                 const address = mm.address ? (String(mm.address).split(',').slice(0, -1).join(',') || mm.address) : 'No Address';
                 const addrType = row.addressType || '-';
-                const attempted = row.latestAttempt || 'N/A';
+                const attemptedRaw = row.latestAttempt || '';
+                let attempted = 'N/A';
+                try {
+                    const timeMatch = String(attemptedRaw).match(/\b(\d{1,2}):(\d{2})\b/);
+                    if (timeMatch) {
+                        attempted = `${timeMatch[1].padStart(2,'0')}:${timeMatch[2]}`;
+                    } else if (/T\d{2}:\d{2}:\d{2}/.test(String(attemptedRaw))) {
+                        const d = new Date(attemptedRaw);
+                        if (!isNaN(d.getTime())) {
+                            const hh = String(d.getHours()).padStart(2,'0');
+                            const mm2 = String(d.getMinutes()).padStart(2,'0');
+                            attempted = `${hh}:${mm2}`;
+                        }
+                    }
+                } catch {}
                 const timeWindow = mm.timeWindow || 'No Time Window';
                 table += `| ${tracking} | ${reason} | ${route} | ${address} | ${addrType} | ${attempted} | ${timeWindow} |\n`;
             }
@@ -1171,7 +1216,7 @@ async function runFailedReattemptReport() {
     if (dspsWithFailures.length > 0) {
         const actionPlan =
 `/md\n### Action Guide | Handlungsanleitung\n\n`+
-`🏢 BUSINESS_CLOSED:\n`+
+`**🏢 BUSINESS_CLOSED:**\n`+
 `- Without Time Window | Ohne Zeitfenster:\n`+
 `  → FQA will add the Time Window | FQA fügt das Zeitfenster hinzu\n`+
 `- With Time Window (Inside the TW) | Mit Zeitfenster (Innerhalb Zeitfenster):\n`+
