@@ -1128,32 +1128,58 @@ async function parseManifestExcel(file) {
     const ab = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(ab), { type: 'array' });
     const out = {};
-    const norm = (s) => String(s || '').trim();
-    const normalizeKey = (h) => String(h || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const norm = (s) => String(s ?? '').trim();
+    const normalizeKey = (h) => String(h ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const likely = {
+        trackingId: ['tracking_id','trackingid','tracking','tid','id'],
+        address: ['actual_customer_address','customer_address','address'],
+        tw: ['time_window','timewindow','tw'],
+        start: ['start_time','start','tw_start','time_window_start','starttime'],
+        end: ['end_time','end','tw_end','time_window_end','endtime']
+    };
     const pickByHeader = (rowObj, keys) => {
         for (const k of keys) {
-            if (rowObj[k] != null) return norm(rowObj[k]);
+            if (rowObj[k] != null && String(rowObj[k]).length) return norm(rowObj[k]);
         }
         return '';
+    };
+    const headerHas = (hdr, pats) => pats.some(p => hdr.includes(p));
+    const findHeaderRow = (rows) => {
+        const maxScan = Math.min(rows.length, 15);
+        for (let r = 0; r < maxScan; r++) {
+            const raw = rows[r] || [];
+            const hdr = raw.map(normalizeKey).map(h => h.replace(/^unnamed_.*$/, ''));
+            if (!hdr.length) continue;
+            const hasTracking = hdr.some(h => headerHas(h, likely.trackingId));
+            const hasTW = hdr.some(h => headerHas(h, likely.tw)) || (hdr.some(h => headerHas(h, likely.start)) && hdr.some(h => headerHas(h, likely.end)));
+            if (hasTracking && hasTW) return { index: r, header: hdr };
+        }
+        // fallback: first non-empty row
+        for (let r = 0; r < maxScan; r++) {
+            const raw = rows[r] || [];
+            const hdr = raw.map(normalizeKey);
+            if (hdr.some(Boolean)) return { index: r, header: hdr };
+        }
+        return { index: 0, header: (rows[0] || []).map(normalizeKey) };
     };
     for (const sheetName of wb.SheetNames) {
         const ws = wb.Sheets[sheetName];
         if (!ws) continue;
-        const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-        if (!json || json.length < 2) continue;
-        const header = json[0].map(normalizeKey);
-        const rows = json.slice(1);
-        for (const arr of rows) {
+        const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+        if (!grid || grid.length < 2) continue;
+        const { index: hdrIdx, header } = findHeaderRow(grid);
+        const data = grid.slice(hdrIdx + 1);
+        for (const arr of data) {
             if (!arr || !arr.length) continue;
             const rowObj = {};
             header.forEach((h, i) => { if (h) rowObj[h] = arr[i]; });
-            const trackingId = norm(pickByHeader(rowObj, ['tracking_id','trackingid','tracking','tid','id'])).toUpperCase();
+            const trackingId = norm(pickByHeader(rowObj, likely.trackingId)).toUpperCase();
             if (!trackingId) continue;
-            const address = pickByHeader(rowObj, ['actual_customer_address','customer_address','address']);
-            let timeWindow = pickByHeader(rowObj, ['time_window','timewindow','tw']);
+            const address = pickByHeader(rowObj, likely.address);
+            let timeWindow = pickByHeader(rowObj, likely.tw);
             if (!timeWindow) {
-                const st = pickByHeader(rowObj, ['start_time','start']);
-                const et = pickByHeader(rowObj, ['end_time','end']);
+                const st = pickByHeader(rowObj, likely.start);
+                const et = pickByHeader(rowObj, likely.end);
                 if (st || et) timeWindow = `${st || ''} - ${et || ''}`.trim();
             }
             if (address || timeWindow) out[trackingId] = { address, timeWindow: timeWindow || 'No Time Window' };
