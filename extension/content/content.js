@@ -715,6 +715,9 @@ function extractAndFormatDSPSummariesFromRoutePlanning(targetDSPs = [], paidTime
     // Format summaries
     const items = {};
     const parts = [];
+    // Compute today's date (DD.MM.YYYY) for header context
+    const _now = new Date();
+    const todayStr = `${String(_now.getDate()).padStart(2, '0')}.${String(_now.getMonth() + 1).padStart(2, '0')}.${_now.getFullYear()}`;
     for (const dsp of dspKeys.sort()) {
         const a = agg.get(dsp);
         if (!a || a.count === 0) continue;
@@ -723,12 +726,15 @@ function extractAndFormatDSPSummariesFromRoutePlanning(targetDSPs = [], paidTime
 
         items[dsp] = { avgShift, avgSpr, paid: paidTimeMinutes };
 
+        // Use concise emoji-based format, mirroring popup summary template
         const block = [
-            `DSP Summary: ${dsp} (Standard Parcel Only)`,
+            '📋 Daily Route Planning Summary',
             '',
-            'DSP\tShift Time Minutes\tAvg. of SPR\tPaid Time Minutes',
-            `${dsp}\t${avgShift}\t${avgSpr}\t${paidTimeMinutes}`,
-            `Grand Total\t${avgShift}\t${avgSpr}\t${paidTimeMinutes}`
+            `🚚 ${dsp} | ${todayStr}`,
+            '',
+            `📦 SPR: ${avgSpr}`,
+            `⏱️ Shift Time: ${avgShift} min`,
+            `💰 Paid Time: ${paidTimeMinutes} min`,
         ].join('\n');
 
         parts.push(block);
@@ -759,8 +765,11 @@ function extractOngoingRisksFromPage() {
         utl: ['utl', 'unable to locate'],
         uta: ['uta', 'unable to access'],
         missing: ['missing'],
-        rejectedDelayed: ['rejected', 'delayed by da', 'rejected/delayed'],
-        unknownStop: ['unknown stop'],
+        // Some dashboards split rejected and delayed columns; match both
+        rejectedDelayed: ['rejected/delayed', 'rejected & delayed', 'rejected and delayed'],
+        rejected: ['rejected'],
+        delayedByDa: ['delayed by da', 'delayed'],
+        unknownStop: ['unknown stop', 'unknown'],
         reason: ['reason'],
         dspAction: ['dsp action'],
         comment: ['comment'],
@@ -810,7 +819,10 @@ function extractOngoingRisksFromPage() {
                 utl: val('utl'),
                 uta: val('uta'),
                 missing: val('missing'),
+                // Prefer combined column, else pass individual fields for background to sum
                 rejectedDelayed: val('rejectedDelayed'),
+                rejected: val('rejected'),
+                delayedByDa: val('delayedByDa'),
                 unknownStop: val('unknownStop'),
                 reason: val('reason'),
                 dspAction: val('dspAction'),

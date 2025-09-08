@@ -803,17 +803,26 @@ async function saveGeneralSettings() {
         const riskDashboardUrl = (elements.riskDashboardUrl?.value || '').trim();
         const slackWebhookUrl = (elements.slackWebhookUrl?.value || '').trim();
         const slackUseChimeMarkdown = !!elements.slackUseChimeMarkdown?.checked;
-        const thresholds = {
-            bc: parseInt(elements.thrBc?.value || '10', 10),
-            bcResidential: parseInt(elements.thrBcResidential?.value || '5', 10),
-            cna: parseInt(elements.thrCna?.value || '25', 10),
-            cnaOutlierFactor: parseFloat(elements.thrCnaFactor?.value || '1.5'),
-            missing: parseInt(elements.thrMissing?.value || '1', 10),
-            uta: parseInt(elements.thrUta?.value || '5', 10),
-            utl: parseInt(elements.thrUtl?.value || '5', 10),
-            rejected: parseInt(elements.thrRejected?.value || '2', 10),
+        // Safe parsers with defaults to avoid NaN thresholds breaking alerts
+        const pInt = (val, def) => {
+            const n = parseInt(String(val ?? ''), 10);
+            return Number.isFinite(n) ? n : def;
         };
-        const renotifyStep = parseInt(elements.thrRenotifyStep?.value || '5', 10);
+        const pFloat = (val, def) => {
+            const n = parseFloat(String(val ?? ''));
+            return Number.isFinite(n) ? n : def;
+        };
+        const thresholds = {
+            bc: pInt(elements.thrBc?.value, 10),
+            bcResidential: pInt(elements.thrBcResidential?.value, 5),
+            cna: pInt(elements.thrCna?.value, 25),
+            cnaOutlierFactor: pFloat(elements.thrCnaFactor?.value, 1.5),
+            missing: pInt(elements.thrMissing?.value, 1),
+            uta: pInt(elements.thrUta?.value, 5),
+            utl: pInt(elements.thrUtl?.value, 5),
+            rejected: pInt(elements.thrRejected?.value, 2),
+        };
+        const renotifyStep = pInt(elements.thrRenotifyStep?.value, 5);
 
         // Normalize URLs (strip dates, extract IDs)
         const { schedulingBaseUrl, parsedServiceAreaId } = normalizeSchedulingUrl(schedulingRaw, serviceAreaId);

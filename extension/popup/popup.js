@@ -151,14 +151,21 @@ async function handleSendSummary() {
             }
 
             const { avgShift, avgSpr } = item;
-            // Build Chime Markdown message as a simple list (no table, no grand total)
-            const message = `/md Moin,\n\n` +
-                `anbei die heutigen Standard Parcel SPR, Shift Time und Paid Time Minutes.\n\n` +
-                `Datum: ${todayStr}\n\n` +
-                `• DSP: ${dsp}\n` +
-                `• Shift Time Minutes: ${avgShift}\n` +
-                `• Avg SPR: ${avgSpr}\n` +
-                `• Paid Time Minutes: ${paidTime}`;
+            // Build Chime Markdown message using the requested concise format
+            // Example:
+            // 📋 Daily Route Planning Summary
+            //
+            // 🚚 SPTN | 08.09.2025
+            //
+            // 📦 SPR: 167
+            // ⏱️ Shift Time: 504 min
+            // 💰 Paid Time: 525 min
+            const message =
+                `/md 📋 Daily Route Planning Summary\n\n` +
+                `🚚 ${dsp} | ${todayStr}\n\n` +
+                `📦 SPR: ${avgSpr}\n` +
+                `⏱️ Shift Time: ${avgShift} min\n` +
+                `💰 Paid Time: ${paidTime} min`;
 
             const result = await browser.runtime.sendMessage({
                 action: 'sendMessage',

@@ -712,7 +712,19 @@ async function getAlarmStatus() {
 
 async function getRiskSettings() {
     const { settings = {} } = await browser.storage.local.get('settings');
-    const thr = settings.riskThresholds || { bc: 10, bcResidential: 5, cna: 25, cnaOutlierFactor: 1.5, missing: 1, uta: 5, utl: 5, rejected: 2 };
+    const defaults = { bc: 10, bcResidential: 5, cna: 25, cnaOutlierFactor: 1.5, missing: 1, uta: 5, utl: 5, rejected: 2 };
+    const st = settings.riskThresholds || {};
+    const coerce = (v, d) => (Number.isFinite(v) ? v : d);
+    const thr = {
+        bc: coerce(parseInt(st.bc, 10), defaults.bc),
+        bcResidential: coerce(parseInt(st.bcResidential, 10), defaults.bcResidential),
+        cna: coerce(parseInt(st.cna, 10), defaults.cna),
+        cnaOutlierFactor: coerce(parseFloat(st.cnaOutlierFactor), defaults.cnaOutlierFactor),
+        missing: coerce(parseInt(st.missing, 10), defaults.missing),
+        uta: coerce(parseInt(st.uta, 10), defaults.uta),
+        utl: coerce(parseInt(st.utl, 10), defaults.utl),
+        rejected: coerce(parseInt(st.rejected, 10), defaults.rejected),
+    };
     return {
         enabled: settings.riskAlertsEnabled === true,
         dashboardUrl: settings.riskDashboardUrl || '',
@@ -830,21 +842,22 @@ function flagRiskRows(rows, thresholds) {
         const missing = parseIntSafe(r.missing);
         const uta = parseIntSafe(r.uta);
         const utl = parseIntSafe(r.utl);
-        const rej = parseIntSafe(r.rejectedDelayed || r.rejected || r.delayedByDa);
+        // Sum separate columns if present
+        const rej = parseIntSafe(r.rejectedDelayed) + parseIntSafe(r.rejected) + parseIntSafe(r.delayedByDa);
 
         // Threshold rules
-        if (bc > thresholds.bc) flagged.push({ ...r, type: 'BC', count: bc, reason: `Business Closed > ${thresholds.bc}` });
+        if (bc >= thresholds.bc) flagged.push({ ...r, type: 'BC', count: bc, reason: `Business Closed >= ${thresholds.bc}` });
         // Address type check
-        if (bc > thresholds.bcResidential && (r.addressType || '').toLowerCase().includes('residential')) {
-            flagged.push({ ...r, type: 'BC', count: bc, reason: `BC > ${thresholds.bcResidential} at Residential` });
+        if (bc >= thresholds.bcResidential && (r.addressType || '').toLowerCase().includes('residential')) {
+            flagged.push({ ...r, type: 'BC', count: bc, reason: `BC >= ${thresholds.bcResidential} at Residential` });
         }
         if (cna >= thresholds.cna && (cnaMedian === 0 || cna >= Math.max(thresholds.cna, Math.round(cnaMedian * (thresholds.cnaOutlierFactor || 1.5))))) {
             flagged.push({ ...r, type: 'CNA', count: cna, reason: `CNA outlier (>=${thresholds.cna} and >=${thresholds.cnaOutlierFactor || 1.5}x median ${cnaMedian})` });
         }
-        if (missing > thresholds.missing) flagged.push({ ...r, type: 'MISSING', count: missing, reason: `Missing > ${thresholds.missing}` });
-        if (uta > thresholds.uta) flagged.push({ ...r, type: 'UTA', count: uta, reason: `Unable To Access > ${thresholds.uta}` });
-        if (utl > thresholds.utl) flagged.push({ ...r, type: 'UTL', count: utl, reason: `Unable To Locate > ${thresholds.utl}` });
-        if (rej > thresholds.rejected) flagged.push({ ...r, type: 'REJECTED_DELAYED', count: rej, reason: `Rejected/Delayed by DA > ${thresholds.rejected}` });
+        if (missing >= thresholds.missing) flagged.push({ ...r, type: 'MISSING', count: missing, reason: `Missing >= ${thresholds.missing}` });
+        if (uta >= thresholds.uta) flagged.push({ ...r, type: 'UTA', count: uta, reason: `Unable To Access >= ${thresholds.uta}` });
+        if (utl >= thresholds.utl) flagged.push({ ...r, type: 'UTL', count: utl, reason: `Unable To Locate >= ${thresholds.utl}` });
+        if (rej >= thresholds.rejected) flagged.push({ ...r, type: 'REJECTED_DELAYED', count: rej, reason: `Rejected/Delayed by DA >= ${thresholds.rejected}` });
     }
     return flagged;
 }
