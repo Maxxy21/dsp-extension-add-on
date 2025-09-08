@@ -28,10 +28,18 @@
         </header>
 
         <!-- Main content -->
-        <main class="main">
+        <main class="main tabbed" data-active-tab="general">
+            <div class="tabs">
+                <button class="tab active" data-tab="general">General</button>
+                <button class="tab" data-tab="thresholds">Thresholds</button>
+                <button class="tab" data-tab="service-types">Service Types</button>
+                <button class="tab" data-tab="reattempts">Reattempts</button>
+                <button class="tab" data-tab="uploads">Uploads</button>
+                <button class="tab" data-tab="webhooks">Webhooks</button>
+            </div>
             <div class="settings-grid">
                 <!-- Station / Area Settings Card -->
-                <div class="card">
+                <div class="card" data-section="general">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -75,7 +83,7 @@
                 </div>
 
                 <!-- Risk Alerts Card -->
-                <div class="card">
+                <div class="card" data-section="thresholds">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -179,7 +187,7 @@
                 </div>
 
                 <!-- Failed Reattempts Card -->
-                <div class="card">
+                <div class="card" data-section="reattempts">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -254,7 +262,7 @@
                 </div>
 
                 <!-- Manifest Upload Card -->
-                <div class="card">
+                <div class="card" data-section="uploads">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -269,20 +277,22 @@
                     <div class="card-content">
                         <div class="form-row" style="align-items: center; gap: 16px;">
                             <div class="webhook-field" style="min-width: 380px;">
-                                <label for="manifestUpload">Upload Plan Manifest (.csv)</label>
-                                <input type="file" id="manifestUpload" accept=".csv,text/csv" />
+                                <label for="manifestUpload">Upload Plan Manifest (.xls, .xlsx, .csv)</label>
+                                <input type="file" id="manifestUpload" accept=".csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,.xlsx" />
                                 <small>Expected headers include Tracking ID and either Time Window or Start/End Time. You can export XLS/XLSX as CSV and upload it.</small>
                             </div>
                             <div id="manifestStatus" class="info-content" style="min-width: 220px;">
                                 <span>No manifest uploaded</span>
                             </div>
                             <button id="clearManifestMap" class="btn btn-secondary" type="button">Clear</button>
+                            <button id="sendReattemptsNow" class="btn btn-primary" type="button" title="Use this manifest in-memory and send now">Send Reattempts Now</button>
                         </div>
+                        <small>Excel workbooks with multiple sheets are supported. You do not need to export to CSV.</small>
                     </div>
                 </div>
 
                 <!-- Backbrief Upload Card -->
-                <div class="card">
+                <div class="card" data-section="uploads">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -305,11 +315,12 @@
                                 <span>No backbrief uploaded</span>
                             </div>
                             <button id="clearBackbriefData" class="btn btn-secondary" type="button">Clear</button>
+                            <button id="sendBackbriefNow" class="btn btn-primary" type="button" title="Send using uploaded Backbrief now">Send Now</button>
                         </div>
                     </div>
                 </div>
                 <!-- Output Settings Card -->
-                <div class="card">
+                <div class="card" data-section="general">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -353,7 +364,7 @@
                     </div>
                 </div>
                 <!-- Service Type Settings Card -->
-                <div class="card">
+                <div class="card" data-section="service-types">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -469,7 +480,7 @@
                 </div>
 
                 <!-- Notification Settings Card -->
-                <div class="card">
+                <div class="card" data-section="webhooks">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -497,7 +508,7 @@
                 </div>
 
                 <!-- Webhook Configuration Card -->
-                <div class="card">
+                <div class="card" data-section="webhooks">
                     <div class="card-header">
                         <div class="card-header-content">
                             <h2>
@@ -578,6 +589,7 @@
 
     <!-- Load scripts -->
     <script src="../browser-polyfill.js"></script>
+    <script src="vendor/xlsx.min.js"></script>
     <script src="options.js"></script>
 </body>
 </html>

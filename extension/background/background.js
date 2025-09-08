@@ -1,4 +1,5 @@
 // background/background.js - Enhanced with multi-service type support
+let TEMP_MANIFEST_MAP = {};
 
 async function getWebhookUrl(dspCode) {
     const { webhooks = {} } = await browser.storage.local.get('webhooks');
@@ -217,6 +218,16 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
             case "configureRiskAlarm":
                 await configureRiskAlarm();
                 return { success: true };
+            case "setTempManifestMapChunk": {
+                try {
+                    if (request && request.chunk && typeof request.chunk === 'object') {
+                        Object.assign(TEMP_MANIFEST_MAP, request.chunk);
+                    }
+                    return { success: true };
+                } catch (e) {
+                    return { success: false, error: e.message };
+                }
+            }
             case "configureFailedReattemptsAlarm":
                 await configureFailedReattemptsAlarm();
                 return { success: true };
@@ -227,6 +238,10 @@ browser.runtime.onMessage.addListener(async (request, sender) => {
             case "runFailedReattemptReport": {
                 const res = await runFailedReattemptReport();
                 return { success: true, ...res };
+            }
+            case "previewFailedReattemptStats": {
+                const res = await previewFailedReattemptStats();
+                return { success: !res.error, ...res };
             }
             case "resetRiskDedupe": {
                 await browser.storage.local.set({ riskAlertState: {} });
@@ -1129,6 +1144,11 @@ async function runFailedReattemptReport() {
         }
     }
 
+    // Overlay in-memory manifest map first (if provided from Options upload)
+    if (TEMP_MANIFEST_MAP && Object.keys(TEMP_MANIFEST_MAP).length) {
+        manifestMap = { ...manifestMap, ...TEMP_MANIFEST_MAP };
+    }
+
     // Overlay uploaded manifest map if present
     try {
         const { uploadedManifestMap } = await browser.storage.local.get('uploadedManifestMap');
@@ -1250,6 +1270,8 @@ async function runFailedReattemptReport() {
         }
     }
 
+    // Clear temp manifest to free memory
+    TEMP_MANIFEST_MAP = {};
     return { sent, dspsNotified };
 }
 
@@ -1311,4 +1333,144 @@ function mapCsvRow(o) {
     const latestAttempt = o[get('latest_attempt','attempt_time','compattemptdata_complatestattemptevent_timestamp')] || '';
     const addressType = o[get('address_type')] || '';
     return { trackingId, deliveryStation, route, dspName, reason, attemptReason, latestAttempt, addressType };
+}
+
+// Preview stats for reattempts: counts of total rows and how many have enrichment
+async function previewFailedReattemptStats() {
+    const prepared = await prepareReattemptData();
+    if (prepared.error) return { error: prepared.error };
+    const { rows, manifestMap } = prepared;
+    const totalRows = rows.length;
+    let matchedTimeWindow = 0, matchedAddress = 0, matchedEither = 0;
+    for (const r of rows) {
+        const m = manifestMap[r.trackingId];
+        if (!m) continue;
+        const hasTW = !!m.timeWindow && m.timeWindow !== 'No Time Window';
+        const hasAddr = !!m.address && m.address !== 'No Address';
+        if (hasTW) matchedTimeWindow++;
+        if (hasAddr) matchedAddress++;
+        if (hasTW || hasAddr) matchedEither++;
+    }
+    return { totalRows, matchedTimeWindow, matchedAddress, matchedEither };
+}
+
+// Prepare rows + manifest map used in reattempts flow (without sending)
+async function prepareReattemptData() {
+    try {
+        const { settings = {} } = await browser.storage.local.get('settings');
+        const includeReasons = settings.failedReasons || [
+            'BUSINESS_CLOSED', 'LOCKER_ISSUE', 'UNABLE_TO_LOCATE_ADDRESS', 'UNABLE_TO_ACCESS', 'OTP_NOT_AVAILABLE', 'ITEMS_MISSING'
+        ];
+        const backbriefUrl = settings.failedBackbriefUrl || settings.riskDashboardUrl || '';
+        const routePlanningBaseUrl = settings.routePlanningBaseUrl || '';
+        if (!backbriefUrl) {
+            return { rows: [], manifestMap: {}, error: 'Backbrief dashboard URL not configured' };
+        }
+
+        // Acquire rows: prefer uploaded backbrief
+        let rows = [];
+        try {
+            const { uploadedBackbriefRows } = await browser.storage.local.get('uploadedBackbriefRows');
+            if (uploadedBackbriefRows && Array.isArray(uploadedBackbriefRows.rows) && uploadedBackbriefRows.rows.length) {
+                rows = uploadedBackbriefRows.rows;
+            }
+        } catch {}
+        if (!rows.length) {
+            // Open or reuse dashboard tab and capture live
+            const matches = await browser.tabs.query({ url: backbriefUrl.split('#')[0] + '*' });
+            let tab;
+            if (matches && matches.length > 0) {
+                tab = matches[0];
+                await browser.tabs.update(tab.id, { url: backbriefUrl, active: false });
+            } else {
+                tab = await browser.tabs.create({ url: backbriefUrl, active: false });
+            }
+            await new Promise(r => setTimeout(r, 8000));
+            try {
+                const csvResp = await browser.tabs.sendMessage(tab.id, { action: 'getBackbriefCsv' });
+                if (csvResp?.success && csvResp.csv) {
+                    const parsed = parseBackbriefCsv(csvResp.csv);
+                    rows = parsed;
+                }
+            } catch (e) { console.warn('CSV parse path failed, will fallback:', e); }
+            if (!rows.length) {
+                try {
+                    const response = await browser.tabs.sendMessage(tab.id, { action: 'getBackbriefFailedShipments', includeReasons, mapUnableToAccess: true });
+                    rows = Array.isArray(response?.rows) ? response.rows : [];
+                } catch (e) {
+                    return { rows: [], manifestMap: {}, error: 'Content script not ready on Backbrief page' };
+                }
+            }
+        }
+        // Normalize
+        rows = rows.filter(r => r && r.trackingId).map(r => ({
+            trackingId: (r.trackingId || '').toUpperCase(),
+            deliveryStation: r.deliveryStation || r.ds || '',
+            route: r.route || r.manifestRouteCode || '',
+            dspName: (r.dspName || r.latestDSPName || '').toUpperCase(),
+            reason: (r.attemptReason === 'UNABLE_TO_ACCESS') ? 'UNABLE_TO_ACCESS' : (r.reason || ''),
+            attemptReason: r.attemptReason || '',
+            latestAttempt: r.latestAttempt || r.attemptTime || '',
+            addressType: r.addressType || ''
+        }));
+
+        // Build manifest map
+        let manifestMap = {};
+        if (routePlanningBaseUrl) {
+            try {
+                let rtpUrl = routePlanningBaseUrl;
+                try {
+                    const u = new URL(routePlanningBaseUrl);
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    const dateStr = `${yyyy}-${mm}-${dd}`;
+                    if (/\/route-planning\/[A-Z0-9]+\/.+/.test(u.pathname) && !/\d{4}-\d{2}-\d{2}$/.test(u.pathname)) {
+                        rtpUrl = `${u.origin}${u.pathname}/${dateStr}`;
+                    }
+                } catch {}
+                const matchesRP = await browser.tabs.query({ url: rtpUrl.split('#')[0] + '*' });
+                let tabRP;
+                if (matchesRP && matchesRP.length > 0) {
+                    tabRP = matchesRP[0];
+                    await browser.tabs.update(tabRP.id, { url: rtpUrl, active: false });
+                } else {
+                    tabRP = await browser.tabs.create({ url: rtpUrl, active: false });
+                }
+                await new Promise(r => setTimeout(r, 7000));
+                const manResp = await browser.tabs.sendMessage(tabRP.id, { action: 'getManifestTrackingMap' });
+                if (manResp?.success && manResp.map) manifestMap = manResp.map;
+                if (!manifestMap || Object.keys(manifestMap).length === 0) {
+                    try {
+                        let sheetsUrl = rtpUrl.replace('://eu.route.planning.last-mile.a2z.com/route-planning', '://eu.dispatch.planning.last-mile.a2z.com/route-sheets');
+                        const matchesRS = await browser.tabs.query({ url: sheetsUrl.split('#')[0] + '*' });
+                        let tabRS;
+                        if (matchesRS && matchesRS.length > 0) {
+                            tabRS = matchesRS[0];
+                            await browser.tabs.update(tabRS.id, { url: sheetsUrl, active: false });
+                        } else {
+                            tabRS = await browser.tabs.create({ url: sheetsUrl, active: false });
+                        }
+                        await new Promise(r => setTimeout(r, 7000));
+                        const rsResp = await browser.tabs.sendMessage(tabRS.id, { action: 'getSheetsTrackingMap' });
+                        if (rsResp?.success && rsResp.map) manifestMap = rsResp.map;
+                    } catch (e) { console.warn('Route sheets enrichment failed:', e); }
+                }
+            } catch (e) { console.warn('Manifest enrichment skipped:', e); }
+        }
+        if (TEMP_MANIFEST_MAP && Object.keys(TEMP_MANIFEST_MAP).length) {
+            manifestMap = { ...manifestMap, ...TEMP_MANIFEST_MAP };
+        }
+        try {
+            const { uploadedManifestMap } = await browser.storage.local.get('uploadedManifestMap');
+            if (uploadedManifestMap && uploadedManifestMap.map && Object.keys(uploadedManifestMap.map).length) {
+                manifestMap = { ...manifestMap, ...uploadedManifestMap.map };
+            }
+        } catch {}
+
+        return { rows, manifestMap };
+    } catch (e) {
+        return { rows: [], manifestMap: {}, error: e.message };
+    }
 }

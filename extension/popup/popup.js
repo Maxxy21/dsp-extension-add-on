@@ -102,6 +102,14 @@ async function handleSendReattempts() {
 
     try {
         setButtonLoading(elements.sendReattemptsButton, true);
+        // Preview match stats first
+        try {
+            const preview = await browser.runtime.sendMessage({ action: 'previewFailedReattemptStats' });
+            if (preview?.success) {
+                const { totalRows = 0, matchedTimeWindow = 0, matchedAddress = 0 } = preview;
+                showToast(`Preview: ${matchedTimeWindow}/${totalRows} TW, ${matchedAddress}/${totalRows} Address. Sending...`, 'loading');
+            }
+        } catch {}
         showToast('Collecting Backbrief data and sending...', 'loading');
 
         const result = await browser.runtime.sendMessage({ action: 'runFailedReattemptReport' });

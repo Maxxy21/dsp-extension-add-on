@@ -5,6 +5,7 @@ if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
 // Application state
 let isLoading = false;
 let webhookEntryCount = 0;
+let lastParsedManifestMap = null;
 
 // DOM elements Cache
 let elements = {};
@@ -44,6 +45,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Load settings
         await loadSettings();
+
+        // Setup tabs
+        setupTabs();
+        await restoreActiveTab();
 
         // Setup event listeners
         setupEventListeners();
@@ -134,6 +139,41 @@ function setLoading(loading) {
 
     if (elements.addWebhookBtn) {
         elements.addWebhookBtn.disabled = loading;
+    }
+}
+
+function setupTabs() {
+    try {
+        const tabs = Array.from(document.querySelectorAll('.tabs .tab'));
+        const main = document.querySelector('.main.tabbed');
+        if (!tabs.length || !main) return;
+        tabs.forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const tab = btn.getAttribute('data-tab');
+                setActiveTab(tab);
+                try { await browser.storage.local.set({ optionsActiveTab: tab }); } catch {}
+            });
+        });
+    } catch (e) {
+        console.warn('Tabs setup failed:', e);
+    }
+}
+
+function setActiveTab(tab) {
+    const main = document.querySelector('.main.tabbed');
+    const tabs = Array.from(document.querySelectorAll('.tabs .tab'));
+    if (!main) return;
+    main.setAttribute('data-active-tab', tab);
+    tabs.forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tab));
+}
+
+async function restoreActiveTab() {
+    try {
+        const { optionsActiveTab } = await browser.storage.local.get('optionsActiveTab');
+        const tab = optionsActiveTab || 'general';
+        setActiveTab(tab);
+    } catch {
+        setActiveTab('general');
     }
 }
 
@@ -824,6 +864,10 @@ function setupEventListeners() {
             showToast('Cleared uploaded manifest', 'success');
         });
     }
+    const sendReattemptsNowBtn = document.getElementById('sendReattemptsNow');
+    if (sendReattemptsNowBtn) {
+        sendReattemptsNowBtn.addEventListener('click', sendReattemptsUsingManifest);
+    }
     // Backbrief upload listeners
     elements.backbriefUpload = document.getElementById('backbriefUpload');
     elements.backbriefStatus = document.getElementById('backbriefStatus');
@@ -837,6 +881,10 @@ function setupEventListeners() {
             updateBackbriefStatus(null);
             showToast('Cleared uploaded backbrief', 'success');
         });
+    }
+    const sendBackbriefNowBtn = document.getElementById('sendBackbriefNow');
+    if (sendBackbriefNowBtn) {
+        sendBackbriefNowBtn.addEventListener('click', sendReattemptsUsingBackbrief);
     }
     // Threshold listeners
     [elements.thrBc, elements.thrBcResidential, elements.thrCna, elements.thrCnaFactor, elements.thrMissing, elements.thrUta, elements.thrUtl, elements.thrRejected]
@@ -952,16 +1000,32 @@ async function handleManifestUpload(evt) {
     try {
         const file = evt.target.files && evt.target.files[0];
         if (!file) return;
-        const text = await file.text();
-        const parsed = parseManifestCsv(text);
+        const name = (file.name || '').toLowerCase();
+        let parsed = {};
+        if (name.endsWith('.csv')) {
+            const text = await file.text();
+            parsed = parseManifestCsv(text);
+        } else if (name.endsWith('.xls') || name.endsWith('.xlsx')) {
+            parsed = await parseManifestExcel(file);
+        } else {
+            throw new Error('Unsupported file type. Please upload .xls, .xlsx, or .csv');
+        }
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
-        const state = { date: `${yyyy}-${mm}-${dd}`, count: Object.keys(parsed).length, map: parsed };
-        await browser.storage.local.set({ uploadedManifestMap: state });
+        lastParsedManifestMap = parsed;
+        const count = Object.keys(parsed).length;
+        const state = { date: `${yyyy}-${mm}-${dd}`, count };
+        try {
+            if (count <= 10000) {
+                await browser.storage.local.set({ uploadedManifestMap: { ...state, map: parsed } });
+            } else {
+                await browser.storage.local.remove('uploadedManifestMap');
+            }
+        } catch {}
         updateManifestStatus(state);
-        showToast(`Uploaded ${state.count} manifest rows`, 'success');
+        showToast(`Loaded ${count} manifest rows${count > 10000 ? ' (in memory only)' : ''}`, 'success');
     } catch (e) {
         console.error('Manifest upload failed:', e);
         showToast('Failed to process manifest CSV', 'error');
@@ -1017,6 +1081,83 @@ function parseManifestCsv(text) {
             if (st || et) timeWindow = `${st || ''} - ${et || ''}`.trim();
         }
         if (address || timeWindow) out[trackingId] = { address, timeWindow: timeWindow || 'No Time Window' };
+    }
+    return out;
+}
+
+async function sendReattemptsUsingManifest() {
+    try {
+        if (!lastParsedManifestMap || !Object.keys(lastParsedManifestMap).length) {
+            showToast('Upload a manifest first', 'error');
+            return;
+        }
+        const entries = Object.entries(lastParsedManifestMap);
+        const chunkSize = 5000;
+        showToast('Uploading manifest to background...', 'loading');
+        for (let i = 0; i < entries.length; i += chunkSize) {
+            const slice = entries.slice(i, i + chunkSize);
+            const chunk = Object.fromEntries(slice);
+            await browser.runtime.sendMessage({ action: 'setTempManifestMapChunk', chunk, done: false });
+            await new Promise(r => setTimeout(r, 10));
+        }
+        await browser.runtime.sendMessage({ action: 'setTempManifestMapChunk', chunk: {}, done: true });
+        try {
+            const preview = await browser.runtime.sendMessage({ action: 'previewFailedReattemptStats' });
+            if (preview?.success) {
+                const { totalRows = 0, matchedTimeWindow = 0, matchedAddress = 0 } = preview;
+                showToast(`Preview: ${matchedTimeWindow}/${totalRows} TW, ${matchedAddress}/${totalRows} Address. Sending...`, 'loading');
+            }
+        } catch {}
+        showToast('Running reattempts with uploaded manifest...', 'loading');
+        const res = await browser.runtime.sendMessage({ action: 'runFailedReattemptReport' });
+        if (res?.success) {
+            const { sent = 0, dspsNotified = 0 } = res;
+            showToast(`Sent ${sent} message(s) across ${dspsNotified} DSP(s)`, 'success');
+        } else {
+            showToast(res?.error || 'Failed to send reattempts', 'error');
+        }
+    } catch (e) {
+        showToast(e.message || 'Failed to send reattempts', 'error');
+    }
+}
+
+async function parseManifestExcel(file) {
+    if (typeof XLSX === 'undefined' || !XLSX || !XLSX.read) {
+        throw new Error('Excel parser not available. Please upload CSV or include xlsx.min.js');
+    }
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(ab), { type: 'array' });
+    const out = {};
+    const norm = (s) => String(s || '').trim();
+    const normalizeKey = (h) => String(h || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const pickByHeader = (rowObj, keys) => {
+        for (const k of keys) {
+            if (rowObj[k] != null) return norm(rowObj[k]);
+        }
+        return '';
+    };
+    for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        if (!ws) continue;
+        const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        if (!json || json.length < 2) continue;
+        const header = json[0].map(normalizeKey);
+        const rows = json.slice(1);
+        for (const arr of rows) {
+            if (!arr || !arr.length) continue;
+            const rowObj = {};
+            header.forEach((h, i) => { if (h) rowObj[h] = arr[i]; });
+            const trackingId = norm(pickByHeader(rowObj, ['tracking_id','trackingid','tracking','tid','id'])).toUpperCase();
+            if (!trackingId) continue;
+            const address = pickByHeader(rowObj, ['actual_customer_address','customer_address','address']);
+            let timeWindow = pickByHeader(rowObj, ['time_window','timewindow','tw']);
+            if (!timeWindow) {
+                const st = pickByHeader(rowObj, ['start_time','start']);
+                const et = pickByHeader(rowObj, ['end_time','end']);
+                if (st || et) timeWindow = `${st || ''} - ${et || ''}`.trim();
+            }
+            if (address || timeWindow) out[trackingId] = { address, timeWindow: timeWindow || 'No Time Window' };
+        }
     }
     return out;
 }
@@ -1094,6 +1235,34 @@ function parseBackbriefCsv(text) {
         out.push({ trackingId, deliveryStation, route, dspName, reason, attemptReason, latestAttempt, addressType });
     }
     return out;
+}
+
+async function sendReattemptsUsingBackbrief() {
+    try {
+        // Verify uploaded backbrief exists
+        const { uploadedBackbriefRows } = await browser.storage.local.get('uploadedBackbriefRows');
+        if (!uploadedBackbriefRows || !Array.isArray(uploadedBackbriefRows.rows) || uploadedBackbriefRows.rows.length === 0) {
+            showToast('Upload a Backbrief CSV first', 'error');
+            return;
+        }
+        try {
+            const preview = await browser.runtime.sendMessage({ action: 'previewFailedReattemptStats' });
+            if (preview?.success) {
+                const { totalRows = 0, matchedTimeWindow = 0, matchedAddress = 0 } = preview;
+                showToast(`Preview: ${matchedTimeWindow}/${totalRows} TW, ${matchedAddress}/${totalRows} Address. Sending...`, 'loading');
+            }
+        } catch {}
+        showToast('Running reattempts with uploaded Backbrief...', 'loading');
+        const res = await browser.runtime.sendMessage({ action: 'runFailedReattemptReport' });
+        if (res?.success) {
+            const { sent = 0, dspsNotified = 0 } = res;
+            showToast(`Sent ${sent} message(s) across ${dspsNotified} DSP(s)`, 'success');
+        } else {
+            showToast(res?.error || 'Failed to send reattempts', 'error');
+        }
+    } catch (e) {
+        showToast(e.message || 'Failed to send reattempts', 'error');
+    }
 }
 
 async function saveGeneralSettings() {
