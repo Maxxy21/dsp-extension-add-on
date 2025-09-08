@@ -38,6 +38,7 @@ function cacheElements() {
         charCount: document.getElementById('charCount'),
         checkNowButton: document.getElementById('checkNow'),
         sendSummaryButton: document.getElementById('sendSummary'),
+        sendReattemptsButton: document.getElementById('sendReattempts'),
         sendMessageButton: document.getElementById('sendMessage'),
         openSettingsButton: document.getElementById('openSettings'),
         individualDspGroup: document.getElementById('individualDspGroup'),
@@ -69,6 +70,11 @@ function setupEventListeners() {
         elements.sendSummaryButton.addEventListener('click', handleSendSummary);
     }
 
+    // Send Failed Reattempts button
+    if (elements.sendReattemptsButton) {
+        elements.sendReattemptsButton.addEventListener('click', handleSendReattempts);
+    }
+
     // Settings button
     if (elements.openSettingsButton) {
         elements.openSettingsButton.addEventListener('click', handleOpenSettings);
@@ -82,6 +88,39 @@ function setupEventListeners() {
 
     // Global keyboard shortcuts
     document.addEventListener('keydown', handleGlobalKeydown);
+}
+
+async function handleSendReattempts() {
+    if (isLoading) return;
+
+    // Ensure we have DSP webhooks
+    const selectedDSPs = Object.keys(availableDSPs || {});
+    if (selectedDSPs.length === 0) {
+        showToast('⚠️ No DSP webhooks configured in Settings', 'error');
+        return;
+    }
+
+    try {
+        setButtonLoading(elements.sendReattemptsButton, true);
+        showToast('Collecting Backbrief data and sending...', 'loading');
+
+        const result = await browser.runtime.sendMessage({ action: 'runFailedReattemptReport' });
+        if (result?.success) {
+            const { sent = 0, dspsNotified = 0 } = result;
+            if (sent > 0) {
+                showToast(`✅ Sent ${sent} message(s) across ${dspsNotified} DSP(s)`, 'success');
+            } else {
+                showToast('✅ No failed shipments to send', 'success');
+            }
+        } else {
+            showToast(result?.error || 'Failed to send reattempts', 'error');
+        }
+    } catch (e) {
+        console.error('Send reattempts failed:', e);
+        showToast(`❌ ${e.message}`, 'error');
+    } finally {
+        setButtonLoading(elements.sendReattemptsButton, false);
+    }
 }
 
 async function handleSendSummary() {

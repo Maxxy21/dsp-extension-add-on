@@ -177,6 +177,81 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Failed Reattempts Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-header-content">
+                            <h2>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M3 12a9 9 0 019-9v3l4-4-4-4v3A12 12 0 001 12h2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Failed Shipments to Reattempt
+                            </h2>
+                            <p class="card-description">Configure Backbrief source, reasons, chunk size, and optional daily auto-send</p>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="form-row">
+                            <div class="webhook-field" style="min-width: 420px;">
+                                <label for="failedBackbriefUrl">Backbrief Dashboard URL</label>
+                                <input type="url" id="failedBackbriefUrl" placeholder="https://c3.amazon.com/eu/mercury_amzl/#/dashboard/..." />
+                                <small>Paste the Backbrief dashboard link used to extract failed deliveries</small>
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top: 12px; gap: 16px; align-items: flex-end;">
+                            <div class="webhook-field" style="min-width: 160px;">
+                                <label for="failedChunkSize">Rows per message (chunk)</label>
+                                <input type="number" id="failedChunkSize" min="5" max="50" step="1" placeholder="20" />
+                            </div>
+                            <div class="toggle-setting">
+                                <div class="toggle-info">
+                                    <label class="toggle-label" for="failedAutoEnabled">Enable Daily Auto-Send</label>
+                                    <p class="toggle-description">Sends the reattempts table to DSPs once per day</p>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="failedAutoEnabled">
+                                    <label for="failedAutoEnabled" class="switch"></label>
+                                </div>
+                            </div>
+                            <div class="webhook-field" style="min-width: 140px;">
+                                <label for="failedSendTime">Send time (HH:MM)</label>
+                                <input type="time" id="failedSendTime" />
+                            </div>
+                        </div>
+
+                        <div class="form-row" style="margin-top: 12px;">
+                            <label class="form-label">Include reasons</label>
+                            <div class="checkbox-container" style="display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: 8px; margin-top: 8px;">
+                                <label class="checkbox">
+                                    <input type="checkbox" id="fr_BUSINESS_CLOSED">
+                                    <span>🏢 BUSINESS_CLOSED</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" id="fr_LOCKER_ISSUE">
+                                    <span>🔒 LOCKER_ISSUE</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" id="fr_UNABLE_TO_LOCATE_ADDRESS">
+                                    <span>🗺️ UNABLE_TO_LOCATE_ADDRESS</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" id="fr_UNABLE_TO_ACCESS">
+                                    <span>🚫 UNABLE_TO_ACCESS</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" id="fr_OTP_NOT_AVAILABLE">
+                                    <span>🔑 OTP_NOT_AVAILABLE</span>
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" id="fr_ITEMS_MISSING">
+                                    <span>❓ ITEMS_MISSING</span>
+                                </label>
+                            </div>
+                            <small>Attempt Reason UNABLE_TO_ACCESS will be mapped into Reason automatically</small>
+                        </div>
+                    </div>
+                </div>
                 <!-- Output Settings Card -->
                 <div class="card">
                     <div class="card-header">

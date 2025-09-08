@@ -87,6 +87,17 @@ function cacheElements() {
         thrUtl: document.getElementById('thrUtl'),
         thrRejected: document.getElementById('thrRejected'),
         thrRenotifyStep: document.getElementById('thrRenotifyStep'),
+        // Failed reattempts
+        failedBackbriefUrl: document.getElementById('failedBackbriefUrl'),
+        failedChunkSize: document.getElementById('failedChunkSize'),
+        failedAutoEnabled: document.getElementById('failedAutoEnabled'),
+        failedSendTime: document.getElementById('failedSendTime'),
+        fr_BUSINESS_CLOSED: document.getElementById('fr_BUSINESS_CLOSED'),
+        fr_LOCKER_ISSUE: document.getElementById('fr_LOCKER_ISSUE'),
+        fr_UNABLE_TO_LOCATE_ADDRESS: document.getElementById('fr_UNABLE_TO_LOCATE_ADDRESS'),
+        fr_UNABLE_TO_ACCESS: document.getElementById('fr_UNABLE_TO_ACCESS'),
+        fr_OTP_NOT_AVAILABLE: document.getElementById('fr_OTP_NOT_AVAILABLE'),
+        fr_ITEMS_MISSING: document.getElementById('fr_ITEMS_MISSING'),
         // Service type elements
         enableCycle1: document.getElementById('enableCycle1'),
         enableSamedayB: document.getElementById('enableSamedayB'),
@@ -198,6 +209,18 @@ async function loadGeneralSettings() {
         if (elements.thrUtl) elements.thrUtl.value = thr.utl;
         if (elements.thrRejected) elements.thrRejected.value = thr.rejected;
         if (elements.thrRenotifyStep) elements.thrRenotifyStep.value = renotifyStep;
+
+        // Failed reattempts
+        const failedReasons = settings.failedReasons || [
+            'BUSINESS_CLOSED','LOCKER_ISSUE','UNABLE_TO_LOCATE_ADDRESS','UNABLE_TO_ACCESS','OTP_NOT_AVAILABLE','ITEMS_MISSING'
+        ];
+        if (elements.failedBackbriefUrl) elements.failedBackbriefUrl.value = settings.failedBackbriefUrl || '';
+        if (elements.failedChunkSize) elements.failedChunkSize.value = Number.isFinite(settings.failedChunkSize) ? settings.failedChunkSize : 20;
+        if (elements.failedAutoEnabled) elements.failedAutoEnabled.checked = settings.failedAutoEnabled === true;
+        if (elements.failedSendTime) elements.failedSendTime.value = settings.failedSendTime || '09:00';
+        ['BUSINESS_CLOSED','LOCKER_ISSUE','UNABLE_TO_LOCATE_ADDRESS','UNABLE_TO_ACCESS','OTP_NOT_AVAILABLE','ITEMS_MISSING'].forEach(rid => {
+            const el = elements['fr_' + rid]; if (el) el.checked = failedReasons.includes(rid);
+        });
     } catch (error) {
         console.warn('⚠️ Failed to load general settings, using defaults');
         if (elements.paidTimeMinutes) elements.paidTimeMinutes.value = 525;
@@ -218,6 +241,14 @@ async function loadGeneralSettings() {
         if (elements.thrUtl) elements.thrUtl.value = 5;
         if (elements.thrRejected) elements.thrRejected.value = 2;
         if (elements.thrRenotifyStep) elements.thrRenotifyStep.value = 5;
+        // Failed reattempts defaults
+        if (elements.failedBackbriefUrl) elements.failedBackbriefUrl.value = '';
+        if (elements.failedChunkSize) elements.failedChunkSize.value = 20;
+        if (elements.failedAutoEnabled) elements.failedAutoEnabled.checked = false;
+        if (elements.failedSendTime) elements.failedSendTime.value = '09:00';
+        ['BUSINESS_CLOSED','LOCKER_ISSUE','UNABLE_TO_LOCATE_ADDRESS','UNABLE_TO_ACCESS','OTP_NOT_AVAILABLE','ITEMS_MISSING'].forEach(rid => {
+            const el = elements['fr_' + rid]; if (el) el.checked = true;
+        });
     }
 }
 
@@ -711,6 +742,33 @@ function setupEventListeners() {
     if (elements.slackUseChimeMarkdown) {
         elements.slackUseChimeMarkdown.addEventListener('change', saveGeneralSettings);
     }
+    // Failed reattempts listeners
+    if (elements.failedAutoEnabled) {
+        elements.failedAutoEnabled.addEventListener('change', async () => {
+            await saveGeneralSettings();
+            try { await browser.runtime.sendMessage({ action: 'configureFailedReattemptsAlarm' }); } catch {}
+        });
+    }
+    if (elements.failedBackbriefUrl) {
+        elements.failedBackbriefUrl.addEventListener('change', saveGeneralSettings);
+        elements.failedBackbriefUrl.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.failedChunkSize) {
+        elements.failedChunkSize.addEventListener('change', saveGeneralSettings);
+        elements.failedChunkSize.addEventListener('blur', saveGeneralSettings);
+    }
+    if (elements.failedSendTime) {
+        elements.failedSendTime.addEventListener('change', async () => {
+            await saveGeneralSettings();
+            try { await browser.runtime.sendMessage({ action: 'configureFailedReattemptsAlarm' }); } catch {}
+        });
+        elements.failedSendTime.addEventListener('blur', saveGeneralSettings);
+    }
+    // Reason checkboxes
+    ['BUSINESS_CLOSED','LOCKER_ISSUE','UNABLE_TO_LOCATE_ADDRESS','UNABLE_TO_ACCESS','OTP_NOT_AVAILABLE','ITEMS_MISSING'].forEach(rid => {
+        const el = elements['fr_' + rid];
+        if (el) el.addEventListener('change', saveGeneralSettings);
+    });
     if (elements.testRiskScan) {
         elements.testRiskScan.addEventListener('click', async () => {
             showToast('Running risk scan...', 'loading');
@@ -824,6 +882,20 @@ async function saveGeneralSettings() {
         };
         const renotifyStep = pInt(elements.thrRenotifyStep?.value, 5);
 
+        // Failed reattempts settings
+        const failedBackbriefUrl = (elements.failedBackbriefUrl?.value || '').trim();
+        const failedChunkSize = pInt(elements.failedChunkSize?.value, 20);
+        const failedAutoEnabled = !!elements.failedAutoEnabled?.checked;
+        const failedSendTime = (elements.failedSendTime?.value || '09:00').trim();
+        const failedReasons = [
+            elements.fr_BUSINESS_CLOSED?.checked ? 'BUSINESS_CLOSED' : null,
+            elements.fr_LOCKER_ISSUE?.checked ? 'LOCKER_ISSUE' : null,
+            elements.fr_UNABLE_TO_LOCATE_ADDRESS?.checked ? 'UNABLE_TO_LOCATE_ADDRESS' : null,
+            elements.fr_UNABLE_TO_ACCESS?.checked ? 'UNABLE_TO_ACCESS' : null,
+            elements.fr_OTP_NOT_AVAILABLE?.checked ? 'OTP_NOT_AVAILABLE' : null,
+            elements.fr_ITEMS_MISSING?.checked ? 'ITEMS_MISSING' : null,
+        ].filter(Boolean);
+
         // Normalize URLs (strip dates, extract IDs)
         const { schedulingBaseUrl, parsedServiceAreaId } = normalizeSchedulingUrl(schedulingRaw, serviceAreaId);
         const { routePlanningBaseUrl } = normalizeRoutePlanningUrl(routePlanningRaw);
@@ -841,10 +913,19 @@ async function saveGeneralSettings() {
         settings.slackUseChimeMarkdown = slackUseChimeMarkdown;
         settings.riskThresholds = thresholds;
         settings.riskRenotifyStep = Number.isFinite(renotifyStep) ? renotifyStep : 5;
+        // Failed reattempts
+        settings.failedBackbriefUrl = failedBackbriefUrl;
+        settings.failedChunkSize = failedChunkSize;
+        settings.failedAutoEnabled = failedAutoEnabled;
+        settings.failedSendTime = failedSendTime;
+        settings.failedReasons = failedReasons.length ? failedReasons : ['BUSINESS_CLOSED','LOCKER_ISSUE','UNABLE_TO_LOCATE_ADDRESS','UNABLE_TO_ACCESS','OTP_NOT_AVAILABLE','ITEMS_MISSING'];
 
         await browser.storage.local.set({ settings });
         showToast('Saved settings', 'success');
         await renderUrlPreviews();
+        // reconfigure alarms affected by settings
+        try { await browser.runtime.sendMessage({ action: 'configureRiskAlarm' }); } catch {}
+        try { await browser.runtime.sendMessage({ action: 'configureFailedReattemptsAlarm' }); } catch {}
     } catch (error) {
         console.error('❌ Error saving general settings:', error);
         showToast('Failed to save output settings', 'error');
