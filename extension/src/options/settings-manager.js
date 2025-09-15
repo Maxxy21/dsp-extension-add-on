@@ -386,6 +386,7 @@ export class SettingsManager {
                     formatManualMessagesForChime: true,
                     riskAlertsEnabled: false,
                     slackUseChimeMarkdown: false,
+                    inferPaidTime: false,
                     serviceAreaId: '',
                     schedulingBaseUrl: '',
                     routePlanningBaseUrl: '',

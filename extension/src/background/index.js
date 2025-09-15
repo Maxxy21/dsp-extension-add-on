@@ -172,6 +172,9 @@ class BackgroundService {
                 case MESSAGE_TYPES.SEND_SUMMARY:
                     return await this.handleSendSummary(message);
 
+                case MESSAGE_TYPES.TEST_WEBHOOK:
+                    return await this.handleTestWebhook(message);
+
                 default:
                     console.warn('Unknown message action:', message.action);
                     return { success: false, error: 'Unknown action' };
@@ -331,6 +334,31 @@ class BackgroundService {
         // This will be implemented when we create the summary service
         console.log('📊 Summary send requested');
         return { success: true, message: 'Summary sent (placeholder)' };
+    }
+
+    async handleTestWebhook(message) {
+        const { dspCode, webhookUrl } = message;
+
+        if (!webhookUrl) {
+            return { success: false, error: 'Webhook URL is required' };
+        }
+
+        try {
+            await this.webhookSender.sendWebhook(
+                webhookUrl,
+                '🧪 Test message from DSP Management Extension\n\nThis is a verification ping to confirm your webhook is reachable.',
+                {
+                    title: 'Webhook Test',
+                    dspCode,
+                    urgent: false,
+                }
+            );
+
+            return { success: true };
+        } catch (error) {
+            ErrorHandler.logError(error, 'BackgroundService.handleTestWebhook');
+            return { success: false, error: error.message };
+        }
     }
 
     /**

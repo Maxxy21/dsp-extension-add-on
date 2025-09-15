@@ -111,6 +111,7 @@ export const MESSAGE_TYPES = {
     UPLOAD_FILE: 'uploadFile',
     SEND_SUMMARY: 'sendSummary',
     SCAN_RISKS: 'scanRisks',
+    TEST_WEBHOOK: 'testWebhook',
 };
 
 // Storage keys

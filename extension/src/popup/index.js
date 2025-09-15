@@ -475,7 +475,9 @@ class PopupManager {
                 action: MESSAGE_TYPES.GET_SETTINGS,
             });
 
-            const isConnected = response && response.success;
+            const webhooks = response?.settings?.webhooks || {};
+            const hasWebhooks = Object.keys(webhooks).length > 0;
+            const isConnected = Boolean(response?.success && hasWebhooks);
             this.updateConnectionStatus(isConnected);
 
             return isConnected;
@@ -498,8 +500,13 @@ class PopupManager {
             connected ? 'connected' : 'disconnected'
         }`;
         this.elements.connectionStatus.title = connected
-            ? 'Extension connected'
-            : 'Extension disconnected';
+            ? 'Extension ready to send notifications'
+            : 'Configure webhooks in options to enable notifications';
+
+        const statusText = this.elements.connectionStatus.querySelector('span');
+        if (statusText) {
+            statusText.textContent = connected ? 'Ready' : 'Setup Required';
+        }
     }
 
     /**

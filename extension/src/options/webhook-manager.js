@@ -4,7 +4,6 @@
 
 import { storageService } from '../shared/storage.js';
 import { isValidWebhookUrl, isValidDSPCode } from '../shared/utils/validation.js';
-import { parseCSV } from '../shared/utils/parser-utils.js';
 import { ValidationError, withErrorHandling } from '../shared/errors.js';
 
 export class WebhookManager {
@@ -13,12 +12,16 @@ export class WebhookManager {
         this.elements = {
             webhookEntries: null,
             addWebhookBtn: null,
-            importBtn: null,
-            exportBtn: null,
+            batchDropZone: null,
+            batchTextInput: null,
+            showTextInputBtn: null,
+            processBatchBtn: null,
+            cancelBatchBtn: null,
         };
 
         this.testResults = new Map();
         this.isTestingWebhooks = false;
+        this.autoSaveTimeout = null;
     }
 
     /**
@@ -43,19 +46,56 @@ export class WebhookManager {
             );
         }
 
-        // Import/Export buttons
-        if (this.elements.importBtn) {
-            this.elements.importBtn.addEventListener(
+        if (this.elements.showTextInputBtn) {
+            this.elements.showTextInputBtn.addEventListener(
                 'click',
-                withErrorHandling(this.importWebhooks.bind(this), 'WebhookManager.importWebhooks')
+                withErrorHandling(
+                    () => this.toggleBatchTextInput(true),
+                    'WebhookManager.showBatchInput'
+                )
             );
         }
 
-        if (this.elements.exportBtn) {
-            this.elements.exportBtn.addEventListener(
+        if (this.elements.cancelBatchBtn) {
+            this.elements.cancelBatchBtn.addEventListener(
                 'click',
-                withErrorHandling(this.exportWebhooks.bind(this), 'WebhookManager.exportWebhooks')
+                withErrorHandling(
+                    () => this.toggleBatchTextInput(false),
+                    'WebhookManager.cancelBatchInput'
+                )
             );
+        }
+
+        if (this.elements.processBatchBtn) {
+            this.elements.processBatchBtn.addEventListener(
+                'click',
+                withErrorHandling(
+                    this.handleBatchTextSubmit.bind(this),
+                    'WebhookManager.handleBatchTextSubmit'
+                )
+            );
+        }
+
+        if (this.elements.batchDropZone) {
+            const dropZone = this.elements.batchDropZone;
+            dropZone.addEventListener('dragover', event => {
+                event.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener(
+                'drop',
+                withErrorHandling(this.handleBatchDrop.bind(this), 'WebhookManager.handleBatchDrop')
+            );
+
+            dropZone.addEventListener('click', () => {
+                this.toggleBatchTextInput(true);
+                this.elements.batchTextInput?.focus();
+            });
         }
 
         // Container event delegation for dynamic elements
@@ -98,11 +138,14 @@ export class WebhookManager {
     /**
      * Save webhooks to storage
      */
-    async saveWebhooks() {
+    async saveWebhooks(options = {}) {
+        const { silent = false } = options;
         try {
             await storageService.setWebhooks(this.webhooks);
             console.log('💾 Webhooks saved successfully');
-            this.showSuccess('Webhook configurations saved');
+            if (!silent) {
+                this.showSuccess('Webhook configurations saved');
+            }
         } catch (error) {
             console.error('Failed to save webhooks:', error);
             this.showError('Failed to save webhook configurations');
@@ -139,6 +182,7 @@ export class WebhookManager {
     createWebhookEntry(dspCode = '', webhookUrl = '') {
         const entryDiv = document.createElement('div');
         entryDiv.className = 'webhook-entry';
+        entryDiv.dataset.dspCode = dspCode;
 
         const fields = document.createElement('div');
         fields.className = 'webhook-fields';
@@ -236,15 +280,9 @@ export class WebhookManager {
         // Update validation
         this.validateWebhookEntry(entry);
 
-        // Auto-save if both fields are filled
         const dspInput = entry.querySelector('.dsp-code-input');
         const urlInput = entry.querySelector('.webhook-url-input');
 
-        if (dspInput?.value.trim() && urlInput?.value.trim()) {
-            this.debounceAutoSave();
-        }
-
-        // Add new empty entry if this is the last entry and both fields are filled
         if (
             entry === this.elements.webhookEntries.lastElementChild &&
             dspInput?.value.trim() &&
@@ -252,6 +290,150 @@ export class WebhookManager {
         ) {
             this.addWebhookEntry();
         }
+
+        this.debounceAutoSave();
+    }
+
+    toggleBatchTextInput(show) {
+        const textInput = this.elements.batchTextInput;
+        const processBtn = this.elements.processBatchBtn;
+        const cancelBtn = this.elements.cancelBatchBtn;
+        const showBtn = this.elements.showTextInputBtn;
+
+        if (!textInput || !processBtn || !cancelBtn || !showBtn) {
+            return;
+        }
+
+        textInput.style.display = show ? 'block' : 'none';
+        processBtn.style.display = show ? 'inline-flex' : 'none';
+        cancelBtn.style.display = show ? 'inline-flex' : 'none';
+        showBtn.style.display = show ? 'none' : 'inline-flex';
+
+        if (!show) {
+            textInput.value = '';
+        }
+    }
+
+    async handleBatchTextSubmit() {
+        const textInput = this.elements.batchTextInput;
+        if (!textInput) {
+            return;
+        }
+
+        const imported = await this.processBatchContent(textInput.value);
+        if (imported > 0) {
+            this.toggleBatchTextInput(false);
+        }
+    }
+
+    async handleBatchDrop(event) {
+        event.preventDefault();
+        this.elements.batchDropZone?.classList.remove('drag-over');
+
+        const { dataTransfer } = event;
+        if (!dataTransfer) {
+            return;
+        }
+
+        // Prefer file drop if available
+        if (dataTransfer.files && dataTransfer.files.length > 0) {
+            const file = dataTransfer.files[0];
+            try {
+                const text = await this.readFileAsText(file);
+                await this.processBatchContent(text);
+            } catch (error) {
+                console.error('Batch drop failed:', error);
+                this.showError('Failed to read dropped file');
+            }
+            return;
+        }
+
+        const text = dataTransfer.getData('text') || dataTransfer.getData('text/plain');
+        if (text) {
+            await this.processBatchContent(text);
+            return;
+        }
+
+        this.showInfo('No text data detected in drop');
+    }
+
+    async processBatchContent(rawText) {
+        if (!rawText || !rawText.trim()) {
+            this.showError('No webhook data provided');
+            return 0;
+        }
+
+        const { records, skipped } = this.parseBatchRecords(rawText);
+
+        if (records.length === 0) {
+            this.showError('No valid webhook entries found');
+            return 0;
+        }
+
+        records.forEach(({ dspCode, webhookUrl }) => {
+            this.webhooks[dspCode] = webhookUrl;
+        });
+
+        await this.saveWebhooks({ silent: true });
+        this.renderWebhookEntries();
+
+        if (this.elements.batchTextInput) {
+            this.elements.batchTextInput.value = '';
+        }
+
+        const importedCount = records.length;
+        const message =
+            skipped > 0
+                ? `Imported ${importedCount} webhooks. Skipped ${skipped} invalid entries.`
+                : `Imported ${importedCount} webhooks.`;
+
+        this.showSuccess(message);
+        return importedCount;
+    }
+
+    parseBatchRecords(rawText) {
+        const lines = rawText
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(Boolean);
+
+        if (lines.length > 0 && /dsp/i.test(lines[0]) && /webhook/i.test(lines[0])) {
+            lines.shift();
+        }
+
+        const records = [];
+        let skipped = 0;
+
+        lines.forEach(line => {
+            let dspCode = '';
+            let webhookUrl = '';
+
+            const commaIndex = line.indexOf(',');
+            const tabIndex = line.indexOf('\t');
+
+            if (commaIndex !== -1 && (tabIndex === -1 || commaIndex < tabIndex)) {
+                dspCode = line.slice(0, commaIndex).trim();
+                webhookUrl = line.slice(commaIndex + 1).trim();
+            } else if (tabIndex !== -1) {
+                dspCode = line.slice(0, tabIndex).trim();
+                webhookUrl = line.slice(tabIndex + 1).trim();
+            } else {
+                const parts = line.split(/\s+/);
+                dspCode = parts.shift()?.trim() || '';
+                webhookUrl = parts.join(' ').trim();
+            }
+
+            dspCode = dspCode.replace(/^"|"$/g, '');
+            webhookUrl = webhookUrl.replace(/^"|"$/g, '');
+
+            if (isValidDSPCode(dspCode) && isValidWebhookUrl(webhookUrl)) {
+                records.push({ dspCode, webhookUrl });
+            } else {
+                skipped++;
+            }
+        });
+
+        return { records, skipped };
     }
 
     /**
@@ -357,6 +539,7 @@ export class WebhookManager {
             return;
         }
 
+        const previousCode = entry.dataset.dspCode;
         const dspCode = dspInput.value.trim();
         const webhookUrl = urlInput.value.trim();
 
@@ -384,9 +567,21 @@ export class WebhookManager {
             }
         }
 
-        // Update webhooks object if both are valid
-        if (dspCode && webhookUrl && isValidDSPCode(dspCode) && isValidWebhookUrl(webhookUrl)) {
+        if (previousCode && previousCode !== dspCode && this.webhooks[previousCode]) {
+            delete this.webhooks[previousCode];
+        }
+
+        if (!dspCode || !webhookUrl) {
+            if (previousCode && !dspCode && this.webhooks[previousCode]) {
+                delete this.webhooks[previousCode];
+            }
+            entry.dataset.dspCode = dspCode || '';
+            return;
+        }
+
+        if (isValidDSPCode(dspCode) && isValidWebhookUrl(webhookUrl)) {
             this.webhooks[dspCode] = webhookUrl;
+            entry.dataset.dspCode = dspCode;
         }
     }
 
@@ -422,100 +617,7 @@ export class WebhookManager {
             countElement.textContent = count;
         }
 
-        // Update export button state
-        if (this.elements.exportBtn) {
-            this.elements.exportBtn.disabled = count === 0;
-        }
-    }
-
-    /**
-     * Import webhooks from CSV
-     */
-    importWebhooks() {
-        try {
-            // Create file input
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.csv';
-
-            fileInput.onchange = async event => {
-                const file = event.target.files[0];
-                if (!file) {
-                    return;
-                }
-
-                try {
-                    const text = await this.readFileAsText(file);
-                    const parsed = parseCSV(text, { headers: true });
-
-                    let imported = 0;
-
-                    for (const row of parsed) {
-                        const dspCode = row.dsp || row.DSP || row['DSP Code'] || '';
-                        const webhookUrl = row.webhook || row.Webhook || row['Webhook URL'] || '';
-
-                        if (
-                            dspCode &&
-                            webhookUrl &&
-                            isValidDSPCode(dspCode) &&
-                            isValidWebhookUrl(webhookUrl)
-                        ) {
-                            this.webhooks[dspCode] = webhookUrl;
-                            imported++;
-                        }
-                    }
-
-                    await this.saveWebhooks();
-                    this.renderWebhookEntries();
-
-                    this.showSuccess(`Imported ${imported} webhook configurations`);
-                } catch (error) {
-                    console.error('Import failed:', error);
-                    this.showError('Failed to import webhooks');
-                }
-            };
-
-            fileInput.click();
-        } catch (error) {
-            console.error('Import setup failed:', error);
-            this.showError('Failed to set up import');
-        }
-    }
-
-    /**
-     * Export webhooks to CSV
-     */
-    exportWebhooks() {
-        try {
-            const webhookEntries = Object.entries(this.webhooks);
-
-            if (webhookEntries.length === 0) {
-                this.showError('No webhooks to export');
-                return;
-            }
-
-            // Create CSV content
-            const csvContent = [
-                'DSP Code,Webhook URL',
-                ...webhookEntries.map(([dsp, url]) => `${dsp},${url}`),
-            ].join('\n');
-
-            // Create and download file
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `dsp-webhooks-${new Date().toISOString().slice(0, 10)}.csv`;
-            link.click();
-
-            URL.revokeObjectURL(url);
-
-            this.showSuccess(`Exported ${webhookEntries.length} webhook configurations`);
-        } catch (error) {
-            console.error('Export failed:', error);
-            this.showError('Failed to export webhooks');
-        }
+        // No explicit counter indicator in UI, but this keeps saved data in sync
     }
 
     /**
@@ -538,7 +640,7 @@ export class WebhookManager {
     debounceAutoSave() {
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
-            this.saveWebhooks();
+            this.saveWebhooks({ silent: true });
         }, 1000);
     }
 

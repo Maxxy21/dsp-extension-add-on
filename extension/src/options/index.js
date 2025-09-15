@@ -96,6 +96,13 @@ class OptionsManager {
             inferPaidTime: document.getElementById('inferPaidTime'),
 
             // Webhook elements
+            webhookEntries: document.getElementById('webhookEntries'),
+            addWebhookBtn: document.getElementById('addWebhook'),
+            batchDropZone: document.getElementById('batchDropZone'),
+            batchTextInput: document.getElementById('batchTextInput'),
+            showTextInputBtn: document.getElementById('showTextInput'),
+            processBatchBtn: document.getElementById('processBatch'),
+            cancelBatchBtn: document.getElementById('cancelBatch'),
             chimeUrl: document.getElementById('chimeUrl'),
             slackUrl: document.getElementById('slackUrl'),
             discordUrl: document.getElementById('discordUrl'),
@@ -160,13 +167,13 @@ class OptionsManager {
         // Webhook Manager
         this.webhookManager = new WebhookManager();
         this.webhookManager.initialize({
-            chimeUrl: this.elements.chimeUrl,
-            slackUrl: this.elements.slackUrl,
-            discordUrl: this.elements.discordUrl,
-            testChimeBtn: this.elements.testChimeBtn,
-            testSlackBtn: this.elements.testSlackBtn,
-            testDiscordBtn: this.elements.testDiscordBtn,
-            clearWebhooksBtn: this.elements.clearWebhooksBtn,
+            webhookEntries: this.elements.webhookEntries,
+            addWebhookBtn: this.elements.addWebhookBtn,
+            batchDropZone: this.elements.batchDropZone,
+            batchTextInput: this.elements.batchTextInput,
+            showTextInputBtn: this.elements.showTextInputBtn,
+            processBatchBtn: this.elements.processBatchBtn,
+            cancelBatchBtn: this.elements.cancelBatchBtn,
         });
     }
 
