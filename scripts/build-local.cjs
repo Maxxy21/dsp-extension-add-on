@@ -7,7 +7,7 @@ console.log('🔨 Building extension with dual manifests...');
 
 // Configuration
 const CONFIG = {
-    sourceDir: './extension',
+    sourceDir: './extension/dist',
     outputDir: './dist',
     excludePatterns: [
         '*.log',
