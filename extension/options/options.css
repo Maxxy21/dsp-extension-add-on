@@ -10,7 +10,7 @@
     --error-light: #fee2e2;
     --warning: #f59e0b;
     --warning-light: #fef3c7;
-    
+
     /* Neutral colors */
     --gray-50: #f8fafc;
     --gray-100: #f1f5f9;
@@ -22,7 +22,7 @@
     --gray-700: #334155;
     --gray-800: #1e293b;
     --gray-900: #0f172a;
-    
+
     /* Semantic colors */
     --background: #ffffff;
     --surface: var(--gray-50);
@@ -30,21 +30,21 @@
     --text-primary: var(--gray-900);
     --text-secondary: var(--gray-600);
     --text-muted: var(--gray-500);
-    
+
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    
+
     /* Border radius */
     --radius-sm: 6px;
     --radius: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-xl: 20px;
-    
+
     /* Spacing */
     --space-1: 4px;
     --space-2: 8px;
@@ -56,10 +56,11 @@
     --space-10: 40px;
     --space-12: 48px;
     --space-16: 64px;
-    
+
     /* Typography */
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-    
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
+        'Cantarell', sans-serif;
+
     /* Transitions */
     --transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-slow: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -108,7 +109,8 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" height="60" width="60"><g fill-rule="evenodd" fill="none"><g fill-opacity="0.05" fill="%23ffffff"><path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"></path></g></g></svg>') repeat;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" height="60" width="60"><g fill-rule="evenodd" fill="none"><g fill-opacity="0.05" fill="%23ffffff"><path d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"></path></g></g></svg>')
+        repeat;
     opacity: 0.3;
     pointer-events: none;
 }
@@ -140,8 +142,13 @@ body {
 }
 
 @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
 }
 
 .logo-text h1 {
@@ -184,7 +191,9 @@ body {
     position: relative;
 }
 
-.tab:hover { color: var(--text-primary); }
+.tab:hover {
+    color: var(--text-primary);
+}
 
 .tab.active {
     color: var(--primary);
@@ -201,13 +210,27 @@ body {
 }
 
 /* Tabbed panes: hide non-active sections */
-.main.tabbed .card { display: none; }
-.main.tabbed[data-active-tab="general"] .card[data-section="general"] { display: block; }
-.main.tabbed[data-active-tab="thresholds"] .card[data-section="thresholds"] { display: block; }
-.main.tabbed[data-active-tab="service-types"] .card[data-section="service-types"] { display: block; }
-.main.tabbed[data-active-tab="reattempts"] .card[data-section="reattempts"] { display: block; }
-.main.tabbed[data-active-tab="uploads"] .card[data-section="uploads"] { display: block; }
-.main.tabbed[data-active-tab="webhooks"] .card[data-section="webhooks"] { display: block; }
+.main.tabbed .card {
+    display: none;
+}
+.main.tabbed[data-active-tab='general'] .card[data-section='general'] {
+    display: block;
+}
+.main.tabbed[data-active-tab='thresholds'] .card[data-section='thresholds'] {
+    display: block;
+}
+.main.tabbed[data-active-tab='service-types'] .card[data-section='service-types'] {
+    display: block;
+}
+.main.tabbed[data-active-tab='reattempts'] .card[data-section='reattempts'] {
+    display: block;
+}
+.main.tabbed[data-active-tab='uploads'] .card[data-section='uploads'] {
+    display: block;
+}
+.main.tabbed[data-active-tab='webhooks'] .card[data-section='webhooks'] {
+    display: block;
+}
 
 .settings-grid {
     display: grid;
@@ -306,7 +329,17 @@ body {
 
 .url-preview .url-link {
     grid-column: 1 / -1;
-    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-family: var(
+        --font-mono,
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        'Liberation Mono',
+        'Courier New',
+        monospace
+    );
     font-size: 13px;
     line-height: 1.45;
     color: var(--text-secondary);
@@ -415,7 +448,7 @@ body {
     flex-shrink: 0;
 }
 
-.toggle-switch input[type="checkbox"] {
+.toggle-switch input[type='checkbox'] {
     opacity: 0;
     width: 0;
     height: 0;
@@ -437,7 +470,7 @@ body {
 }
 
 .switch:before {
-    content: "";
+    content: '';
     position: absolute;
     top: 2px;
     left: 2px;
@@ -453,15 +486,15 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-input[type="checkbox"]:checked + .switch {
+input[type='checkbox']:checked + .switch {
     background: var(--primary);
 }
 
-input[type="checkbox"]:checked + .switch:before {
+input[type='checkbox']:checked + .switch:before {
     transform: translateX(24px);
 }
 
-input[type="checkbox"]:focus + .switch {
+input[type='checkbox']:focus + .switch {
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -507,9 +540,9 @@ input[type="checkbox"]:focus + .switch {
     text-transform: uppercase;
 }
 
-.webhook-field input[type="text"],
-.webhook-field input[type="url"],
-.webhook-field input[type="number"] {
+.webhook-field input[type='text'],
+.webhook-field input[type='url'],
+.webhook-field input[type='number'] {
     width: 100%;
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
@@ -621,6 +654,23 @@ input[type="checkbox"]:focus + .switch {
 }
 
 .btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: var(--surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--background);
+    border-color: var(--gray-300);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+.btn-secondary:active {
     transform: translateY(0);
 }
 
@@ -785,38 +835,38 @@ input[type="checkbox"]:focus + .switch {
     .header {
         padding: var(--space-8) 0;
     }
-    
+
     .logo {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--space-3);
     }
-    
+
     .logo-text h1 {
         font-size: 24px;
     }
-    
+
     .main {
         padding: var(--space-6) var(--space-4) var(--space-8);
     }
-    
+
     .webhook-entry {
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
         padding: var(--space-5);
     }
-    
-    .webhook-field input[type="text"],
-    .webhook-field input[type="url"] {
+
+    .webhook-field input[type='text'],
+    .webhook-field input[type='url'] {
         padding: var(--space-3);
     }
-    
+
     .remove-webhook {
         height: auto;
         padding: var(--space-3);
     }
-    
+
     .toggle-setting {
         flex-direction: column;
         align-items: flex-start;
@@ -828,11 +878,11 @@ input[type="checkbox"]:focus + .switch {
         right: var(--space-4);
         max-width: none;
     }
-    
+
     .service-types-container {
         gap: var(--space-3);
     }
-    
+
     .service-timing {
         padding: var(--space-3) var(--space-4);
     }
@@ -919,7 +969,8 @@ input[type="checkbox"]:focus + .switch {
 .format-examples small {
     font-size: 12px;
     color: var(--text-muted);
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+        monospace;
 }
 
 .format-examples small:first-child {
@@ -941,7 +992,8 @@ input[type="checkbox"]:focus + .switch {
     background: var(--background);
     color: var(--text-primary);
     padding: 20px;
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+        monospace;
     font-size: 13px;
     line-height: 1.5;
     resize: none;
@@ -989,58 +1041,58 @@ input[type="checkbox"]:focus + .switch {
         --error-light: rgba(239, 68, 68, 0.1);
         --warning-light: rgba(245, 158, 11, 0.1);
     }
-    
+
     .card {
         box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
     }
-    
+
     .card:hover {
         box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3);
     }
-    
-    .webhook-field input[type="text"],
-    .webhook-field input[type="url"],
-    .webhook-field input[type="number"] {
+
+    .webhook-field input[type='text'],
+    .webhook-field input[type='url'],
+    .webhook-field input[type='number'] {
         background: var(--surface);
         color: var(--text-primary);
     }
-    
+
     .webhook-field input:focus {
         background: var(--background);
     }
-    
+
     /* Improved dark mode hover states */
     .toggle-setting:hover {
         background: var(--gray-700);
     }
-    
+
     .webhook-entry:hover {
         background: var(--gray-700);
     }
-    
+
     /* Improved dark mode toast notifications */
     .toast.success {
         background: var(--gray-800);
         color: #34d399; /* Bright green for dark mode */
         border-color: var(--success);
     }
-    
+
     .toast.error {
         background: var(--gray-800);
         color: #f87171; /* Bright red for dark mode */
         border-color: var(--error);
     }
-    
+
     .toast.warning {
         background: var(--gray-800);
         color: #fbbf24; /* Bright yellow for dark mode */
         border-color: var(--warning);
     }
-    
+
     .service-timing {
         background: rgba(99, 102, 241, 0.1);
     }
-    
+
     .service-types-info .info-card {
         background: rgba(245, 158, 11, 0.1);
         color: #fbbf24;
@@ -1056,7 +1108,7 @@ input[type="checkbox"]:focus + .switch {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-    
+
     .logo-icon {
         animation: none;
     }

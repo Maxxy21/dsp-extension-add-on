@@ -187,39 +187,59 @@ export class WebhookManager {
         const fields = document.createElement('div');
         fields.className = 'webhook-fields';
 
+        const dspField = document.createElement('div');
+        dspField.className = 'webhook-field';
+        const dspId = `dsp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const dspLabel = document.createElement('label');
+        dspLabel.setAttribute('for', dspId);
+        dspLabel.textContent = 'DSP Code';
+
         const dspInput = document.createElement('input');
         dspInput.type = 'text';
+        dspInput.id = dspId;
         dspInput.className = 'dsp-code-input';
-        dspInput.placeholder = 'DSP Code (e.g., DHH1)';
+        dspInput.placeholder = 'e.g., DHH1';
         dspInput.maxLength = 10;
         dspInput.value = dspCode;
+        dspField.appendChild(dspLabel);
+        dspField.appendChild(dspInput);
+
+        const urlField = document.createElement('div');
+        urlField.className = 'webhook-field';
+        const urlId = `webhook-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const urlLabel = document.createElement('label');
+        urlLabel.setAttribute('for', urlId);
+        urlLabel.textContent = 'Webhook URL';
 
         const urlInput = document.createElement('input');
         urlInput.type = 'url';
+        urlInput.id = urlId;
         urlInput.className = 'webhook-url-input';
-        urlInput.placeholder = 'Webhook URL (https://hooks.chime.aws/...)';
+        urlInput.placeholder = 'https://hooks.chime.aws/...';
         urlInput.value = webhookUrl;
+        urlField.appendChild(urlLabel);
+        urlField.appendChild(urlInput);
 
         const actions = document.createElement('div');
         actions.className = 'webhook-actions';
 
         const testBtn = document.createElement('button');
         testBtn.type = 'button';
-        testBtn.className = 'btn btn-small test-webhook';
+        testBtn.className = 'btn btn-secondary btn-compact test-webhook';
         testBtn.title = 'Test Webhook';
-        testBtn.textContent = '🧪 Test';
+        testBtn.textContent = 'Test';
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'btn btn-small btn-danger remove-webhook';
+        removeBtn.className = 'btn btn-compact remove-webhook';
         removeBtn.title = 'Remove';
-        removeBtn.textContent = '🗑️';
+        removeBtn.textContent = 'Remove';
 
         actions.appendChild(testBtn);
         actions.appendChild(removeBtn);
 
-        fields.appendChild(dspInput);
-        fields.appendChild(urlInput);
+        fields.appendChild(dspField);
+        fields.appendChild(urlField);
         fields.appendChild(actions);
 
         const statusDiv = document.createElement('div');
