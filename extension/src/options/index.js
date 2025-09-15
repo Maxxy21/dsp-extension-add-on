@@ -88,11 +88,12 @@ class OptionsManager {
             enableNotifications: document.getElementById('enableNotifications'),
             paidTimeMinutes: document.getElementById('paidTimeMinutes'),
             serviceAreaId: document.getElementById('serviceAreaId'),
-            schedulingBaseUrl: document.getElementById('schedulingBaseUrl'),
-            routePlanningBaseUrl: document.getElementById('routePlanningBaseUrl'),
+            schedulingBaseUrl: document.getElementById('schedulingUrl'),
+            routePlanningBaseUrl: document.getElementById('routePlanningUrl'),
             riskDashboardUrl: document.getElementById('riskDashboardUrl'),
-            formatManualMessagesForChime: document.getElementById('formatManualMessagesForChime'),
-            riskAlertsEnabled: document.getElementById('riskAlertsEnabled'),
+            formatManualMessagesForChime: document.getElementById('formatChimeManual'),
+            riskAlertsEnabled: document.getElementById('enableRiskAlerts'),
+            inferPaidTime: document.getElementById('inferPaidTime'),
 
             // Webhook elements
             chimeUrl: document.getElementById('chimeUrl'),
@@ -151,6 +152,7 @@ class OptionsManager {
             riskDashboardUrl: this.elements.riskDashboardUrl,
             formatManualMessagesForChime: this.elements.formatManualMessagesForChime,
             riskAlertsEnabled: this.elements.riskAlertsEnabled,
+            inferPaidTime: this.elements.inferPaidTime,
             slackWebhookUrl: this.elements.slackWebhookUrl,
             slackUseChimeMarkdown: this.elements.slackUseChimeMarkdown,
         });
@@ -222,38 +224,42 @@ class OptionsManager {
      * Set up tab navigation
      */
     setupTabNavigation() {
-        const tabButtons = document.querySelectorAll('.tab-button');
-        const tabContents = document.querySelectorAll('.tab-content');
+        const tabContainer = document.querySelector('.main.tabbed');
+        if (!tabContainer) {
+            return;
+        }
+
+        const tabButtons = document.querySelectorAll('.tabs .tab');
+        if (tabButtons.length === 0) {
+            return;
+        }
 
         tabButtons.forEach(button => {
             button.addEventListener('click', event => {
-                const targetTab = event.target.getAttribute('data-tab');
+                const targetTab = event.currentTarget.getAttribute('data-tab');
+                if (!targetTab) {
+                    return;
+                }
 
-                // Update active tab button
                 tabButtons.forEach(btn => btn.classList.remove('active'));
-                event.target.classList.add('active');
+                event.currentTarget.classList.add('active');
 
-                // Update visible tab content
-                tabContents.forEach(content => {
-                    if (content.id === targetTab) {
-                        content.classList.add('active');
-                    } else {
-                        content.classList.remove('active');
-                    }
-                });
-
-                // Store active tab
+                tabContainer.setAttribute('data-active-tab', targetTab);
                 localStorage.setItem('dsp-options-active-tab', targetTab);
             });
         });
 
         // Restore active tab
         const savedTab = localStorage.getItem('dsp-options-active-tab');
-        if (savedTab) {
-            const tabButton = document.querySelector(`[data-tab="${savedTab}"]`);
-            if (tabButton) {
-                tabButton.click();
-            }
+        const defaultTab = savedTab || tabButtons[0].getAttribute('data-tab');
+        const activeButton = defaultTab
+            ? document.querySelector(`.tabs .tab[data-tab="${defaultTab}"]`)
+            : null;
+
+        if (activeButton) {
+            activeButton.click();
+        } else if (tabButtons[0]) {
+            tabButtons[0].click();
         }
     }
 
@@ -462,7 +468,7 @@ class OptionsManager {
             isLoading: this.isLoading,
             fileUploadStats: this.fileUploadManager?.getStatistics(),
             webhookStats: this.webhookManager?.getStatistics(),
-            activeTab: localStorage.getItem('dsp-options-active-tab') || 'settings',
+            activeTab: localStorage.getItem('dsp-options-active-tab') || 'general',
         };
     }
 }

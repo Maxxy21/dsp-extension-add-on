@@ -20,13 +20,13 @@ const GENERAL_SETTINGS_CONFIG = {
         label: 'Service Area ID',
     },
     schedulingBaseUrl: {
-        elementKey: 'schedulingBaseUrl',
+        elementKey: 'schedulingUrl',
         type: 'text',
         defaultValue: '',
         label: 'Scheduling Base URL',
     },
     routePlanningBaseUrl: {
-        elementKey: 'routePlanningBaseUrl',
+        elementKey: 'routePlanningUrl',
         type: 'text',
         defaultValue: '',
         label: 'Route Planning Base URL',
@@ -44,13 +44,13 @@ const GENERAL_SETTINGS_CONFIG = {
         label: 'Slack Webhook URL',
     },
     formatManualMessagesForChime: {
-        elementKey: 'formatManualMessagesForChime',
+        elementKey: 'formatChimeManual',
         type: 'boolean',
         defaultValue: true,
         label: 'Format Messages for Chime',
     },
     riskAlertsEnabled: {
-        elementKey: 'riskAlertsEnabled',
+        elementKey: 'enableRiskAlerts',
         type: 'boolean',
         defaultValue: false,
         label: 'Risk Alerts',
@@ -60,6 +60,12 @@ const GENERAL_SETTINGS_CONFIG = {
         type: 'boolean',
         defaultValue: false,
         label: 'Use Chime Markdown in Slack',
+    },
+    inferPaidTime: {
+        elementKey: 'inferPaidTime',
+        type: 'boolean',
+        defaultValue: false,
+        label: 'Infer Paid Time from Constraints',
     },
 };
 
