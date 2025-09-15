@@ -557,7 +557,7 @@ export class SettingsManager {
     showToast(message, type = 'info') {
         console.log(`Settings Manager Toast (${type}): ${message}`);
 
-        const toast = document.getElementById('toast');
+        const toast = document.getElementById('status');
         if (toast) {
             toast.textContent = message;
             toast.className = `toast ${type} show`;

@@ -119,7 +119,7 @@ class OptionsManager {
             importSettingsBtn: document.getElementById('importSettingsBtn'),
 
             // Status elements
-            toast: document.getElementById('toast'),
+            toast: document.getElementById('status'),
             loadingIndicator: document.getElementById('loadingIndicator'),
         };
     }
