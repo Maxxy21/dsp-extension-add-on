@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+extension/dist/
+web-ext-artifacts/
+
+# Vendor files
+extension/options/vendor/
+extension/browser-polyfill.js
+
+# Generated files
+*.min.js
+*.bundle.js
+
+# Large data files
+*.xlsx
+*.csv
+raw.html
+routeplanning.html
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Coverage reports
+coverage/

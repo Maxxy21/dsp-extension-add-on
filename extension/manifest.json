@@ -17,7 +17,7 @@
   "background": {
     "scripts": [
       "browser-polyfill.js",
-      "background/background.js"
+      "background.js"
     ],
     "persistent": false
   },
@@ -30,7 +30,7 @@
       ],
       "js": [
         "browser-polyfill.js",
-        "content/content.js"
+        "content.js"
       ],
       "run_at": "document_end"
     }

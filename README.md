@@ -90,7 +90,7 @@ export WEB_EXT_API_KEY="your_api_key"
 export WEB_EXT_API_SECRET="your_api_secret"
 
 # Sign extension for distribution
-npm run sign
+npm run sign:mozilla
 ```
 
 Get API credentials from: [addons.mozilla.org/developers/addon/api/key/](https://addons.mozilla.org/developers/addon/api/key/)
