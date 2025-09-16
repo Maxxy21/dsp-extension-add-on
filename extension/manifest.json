@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "DSP Roster Management Tool",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "description": "DSP rostering management with automatic notifications and messaging. Cross-browser compatible with multi-service type support.",
   "permissions": [
     "alarms",
@@ -30,7 +30,17 @@
       ],
       "js": [
         "browser-polyfill.js",
-        "content/content.js"
+        "content/config.js",
+        "content/utils.js",
+        "content/service-inferrer.js",
+        "content/data-parser.js",
+        "content/highlighter.js",
+        "content/app.js",
+        "content/route-summary.js",
+        "content/risk-extractor.js",
+        "content/backbrief-extractor.js",
+        "content/manifest-extractor.js",
+        "content/index.js"
       ],
       "run_at": "document_end"
     }
