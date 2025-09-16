@@ -383,89 +383,9 @@
           }
         },
         {
-          "version": "1.10.1",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.10.1/dsp-extension-v1.10.1.xpi",
-          "update_hash": "sha256:8110437e24df66086ded61798ddaeb38912d331750d202ed8d6e8d1591a7ecd7",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.10.3",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.10.3/dsp-extension-v1.10.3.xpi",
-          "update_hash": "sha256:2cb3f0b9efa0e1cdb0d751361c0506be6ead7d8cf28fdb2f8fe837755ce3b24c",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.0",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.0/dsp-extension-v1.11.0.xpi",
-          "update_hash": "sha256:77dc6114dfa9760effc54c26db0260e3709ceccf36091d9e5db22fea3559afe2",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.2",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.2/dsp-extension-v1.11.2.xpi",
-          "update_hash": "sha256:7c1563dd6ae87867653a7c3520cea2edae60ea0b83e81478e49763c30083d718",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.3",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.3/dsp-extension-v1.11.3.xpi",
-          "update_hash": "sha256:deba8dfbe0cffb41fe6418f972b5e4468caa0dbd371bfb833eb2065a6defee41",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.4",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.4/dsp-extension-v1.11.4.xpi",
-          "update_hash": "sha256:47fd2d0615e63edf42ab63338ad479c73e3abf016284a3fb78f82ab63a683c6b",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.5",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.5/dsp-extension-v1.11.5.xpi",
-          "update_hash": "sha256:7a6332be26756d8c3180b1df0531b7bb212e62c44a43008452a02df459563150",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.6",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.6/dsp-extension-v1.11.6.xpi",
-          "update_hash": "sha256:9c2862161cb191f6e63e7ea5cb81c73967df51a5155764e885040d8c6f19e38f",
-          "applications": {
-            "gecko": {
-              "strict_min_version": "75.0"
-            }
-          }
-        },
-        {
-          "version": "1.11.8",
-          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.11.8/dsp-extension-v1.11.8.xpi",
-          "update_hash": "sha256:898791d63b342aca18c98ae26f7a6c6dd56644d8f949dffc779bfb5192146f3e",
+          "version": "1.10.2",
+          "update_link": "https://github.com/Maxxy21/dsp-extension-hosting/releases/download/v1.10.2/dsp-extension-v1.10.2.xpi",
+          "update_hash": "sha256:ac05c8ca7bd11381499c97cae716a9b1ca72dc38e67473e22aa06407b3ffad35",
           "applications": {
             "gecko": {
               "strict_min_version": "75.0"
